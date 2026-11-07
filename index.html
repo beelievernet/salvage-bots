@@ -70,7 +70,15 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
 /* Touch controls */
 #joyBase{position:absolute;width:110px;height:110px;border-radius:50%;background:#ffffff14;border:2px solid #ffffff30;display:none;z-index:4;pointer-events:none}
 #joyNub{position:absolute;width:48px;height:48px;border-radius:50%;background:#f59e0b;border:2px solid #fff8;left:31px;top:31px;box-shadow:0 6px 18px #0008}
-#jumpBtn{position:absolute;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));width:76px;height:76px;border-radius:50%;background:var(--amber);border:3px solid #fff6;color:#1a1000;font-weight:900;font-size:13px;z-index:4;display:none;box-shadow:0 8px 22px #0009;cursor:pointer;opacity:.3;transition:opacity .15s ease}
+/* FADED JUMP / HOP INDICATOR (the Mr Autofire reference): the round
+   button is a faint indicator, NOT a solid control — rest opacity
+   0.30 in EVERY mode (sidescroller JUMP and top-down HOP share this
+   one element and this one treatment; no mode may override it solid).
+   While any jump/hop touch is active the .lit class (driven by the
+   per-touch registry in syncJumpBtnGlow) raises it to 0.85, and it
+   fades back to 0.30 on release. Faded never means inert: the button
+   stays fully clickable/tappable at rest opacity. */
+#jumpBtn{position:absolute;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));width:76px;height:76px;border-radius:50%;background:var(--amber);border:3px solid #fff6;color:#1a1000;font-weight:900;font-size:13px;z-index:4;display:none;box-shadow:0 8px 22px #0009;cursor:pointer;opacity:.30;transition:opacity .15s ease}
 #jumpBtn.lit{opacity:.85}
 #jumpBtn:active{transform:scale(.94);opacity:.85}
 @media(pointer:coarse){#jumpBtn{display:block}}
@@ -111,6 +119,23 @@ canvas{display:block;width:100%;height:100%;touch-action:none}
 .small{font-size:12px;color:var(--muted)}
 #prompt{position:absolute;left:50%;bottom:104px;transform:translateX(-50%);background:#0f1720e6;border:1px solid var(--cyan);color:#fff;padding:9px 14px;border-radius:999px;font-weight:800;font-size:13px;z-index:6;display:none;text-align:center;max-width:92%}
 #prompt.show{display:block}
+/* Anchored town door prompt: a real tap button pegged to a site door's
+   world position (left/top are set every frame from the door's world
+   coordinates in syncPrompt), floating just above the door. It is the
+   ONLY way into a town site — walking over a door never enters. */
+#doorPrompt{position:absolute;transform:translate(-50%,-100%);background:#0f1720f2;border:2px solid var(--cyan);color:#fff;padding:10px 16px;border-radius:999px;font-weight:900;font-size:14px;letter-spacing:.02em;z-index:7;display:none;text-align:center;white-space:nowrap;box-shadow:0 8px 22px #0009;cursor:pointer}
+#doorPrompt.show{display:block}
+#doorPrompt:active{transform:translate(-50%,-100%) scale(.95)}
+/* Anchored interact prompt: the door treatment generalised — one real
+   tap button pegged above ANY deliberate interactable (workshop, wreck
+   recovery, town stations). Standing on / crossing the thing NEVER
+   activates it; only tapping this visible prompt, or E while it is
+   visible, does. left/top are set every frame from the interactable's
+   world position (see syncActPrompt), at a constant offset, so the
+   button rides with its anchor while the camera moves. */
+#actPrompt{position:absolute;transform:translate(-50%,-100%);background:#0f1720f2;border:2px solid var(--amber);color:#fff;padding:10px 16px;border-radius:999px;font-weight:900;font-size:14px;letter-spacing:.02em;z-index:7;display:none;text-align:center;white-space:nowrap;box-shadow:0 8px 22px #0009;cursor:pointer}
+#actPrompt.show{display:block}
+#actPrompt:active{transform:translate(-50%,-100%) scale(.95)}
 #exitBtn{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);background:var(--cyan);color:#06222b;border:3px solid #fff6;font-weight:900;font-size:14px;border-radius:999px;padding:12px 22px;z-index:5;display:none;box-shadow:0 8px 22px #0009;cursor:pointer}
 #exitBtn.show{display:block}
 #exitBtn:active{transform:translateX(-50%) scale(.96)}
@@ -169,6 +194,8 @@ textarea.export{width:100%;min-height:120px;background:#0a0f14;color:#a5f3fc;bor
     <div id="minimapWrap" title="Open the full map"><canvas id="minimap" width="148" height="104"></canvas><div id="minimapHint">MAP — TAP / M FOR FULL</div></div>
     <div id="toast"></div>
     <div id="prompt"></div>
+    <button id="doorPrompt" aria-label="Enter site"></button>
+    <button id="actPrompt" aria-label="Use interactable"></button>
     <button id="exitBtn">⛏ EXTRACT — RETURN TO TOWN</button>
     <div id="joyBase"><div id="joyNub"></div></div>
     <button id="jumpBtn" aria-label="Jump">JUMP</button>
@@ -185,8 +212,8 @@ textarea.export{width:100%;min-height:120px;background:#0a0f14;color:#a5f3fc;bor
           <div><b>♻️ Death leaves a wreck</b><br>A dead bot stays where it fell — on the ground under where it died, or by the pit it fell into — holding a portion of its installed parts and its haul. Roll out in a new bot and recover it. Wrecks accumulate, and <b>every new death decays all older wrecks</b>, so the pile caps itself.</div>
           <div><b>🏭 Sites remember you</b><br>A site keeps the <b style="color:#fff">same layout</b> while its component or a wreck is still out there — you learn the route back to your wreck. Once a site is stripped clean, it closes and a fresh random site takes its place.</div>
           <div><b>🎯 Auto-fire, real map</b><br>Your blaster aims and fires by itself, in town and in sites — at where the enemy <b>was</b> when the shot fired, so fast enemies genuinely dodge it. It prefers enemies it has a <b>clear shot</b> at — if the nearest enemy is behind a wall but another is in the open, it shoots the open one (aiming at whatever part of it is exposed). Only when <i>nothing</i> in range has a clear shot does it fall back to the nearest enemy anyway and fire at it through the wall — a wall may not always stay between you and a shot. Default move-and-fire is <b>Accuracy</b>: firing while moving scatters shots inside the amber cone drawn from your gun — slow down or stand still to shoot straight (mode &amp; cone angle live in the 🧪 menu). Double jump is standard kit. The map (top-right, or <span class="kbd">M</span>) shows the site as a place — and marks your wrecks ♻ once their section is explored. <b>Sections start fogged</b>: you can make out floors and platforms through the dark, but not what's waiting — a section's defenders only power up, with a brief orange materialise, when you first step in, so nothing can be sniped from a room you haven't entered.</div>
-          <div><b>🛡 The Bunker — a top-down site</b><br>South-east of town stands a fourth building: <b>the Bunker</b> (stand below it and press <span class="kbd">E</span>). It is <b>one</b> top-down site, not a chain: about six fogged rooms on a grid. Down there is <b>no gravity and no jumping</b> — but the town <b>hop</b> works down here too (HOP button, <span class="kbd">Space</span>, or a tap on the right half of the stage), purely as a hop: it dodges no shots and clears no walls. The joystick or <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> moves in 8 directions, walls are solid, and the same autofire, mods, XP, physical drops and wreck rules apply (the Accuracy cone keys off your total speed). Inside: a <b>battle room</b> ⚔️ that seals until its fabricator waves are cleared, a <b>branch fabricator</b> 🏭 guarding a +2 ⚙️ cache, and a <b>guardian</b> 👹 whose death releases the <b>Power Cell (+3 ⚙️)</b>. Only those two kills pay a mod choice. There is no far exit — haul the cell back to the <b>extraction exit in the entry room</b>, live from the moment you arrive. The bunker keeps its layout while a wreck or the cell is outstanding, and counts as cleared once the cell is banked.</div>
-          <div><b>⛏ Zones are chains of maps</b><br>A zone is <b>3 maps</b>. Each map has a <b>battle room</b> ⚔️ (doors seal until you clear the fabricator waves), a branch with a fabricator, and a crowned <b>miniboss</b> 👹 — its door is inert while it lives and opens on its death: onward to the next map, or, on the last map, zone complete. Each map also has an <b>extraction exit by its entry</b>: bank the haul and end the run, or push deeper. <b>Miniboss kills and branch fabricator kills pay a 1-of-3 mod choice</b> (Spread Shot, chain, piercing, homing, bounce — stacking, in-run only, carrying across map doors; reroll from the haul). Kills also pay <b>XP</b> toward automatic small boosts (spawner-born bots pay none). <b>All kill loot is physical</b>: it lands on the ground where things died and joins the haul only when you pick it up. Check what you're carrying any time with the 🎒 button or <span class="kbd">I</span>. Your jumps are a single budget of 2 per airborne stint: jumping off the ground spends one (leaving the classic double jump), but walking off a ledge, dropping through one, or getting knocked off spends none — both jumps are still yours in the air — and landing refills the budget. In Accuracy mode, jumping and falling widen your spread cone; a Spread Shot volley keeps its own wide fixed fan regardless — its centre shot always flies true to your aim. Your shots fly until they hit something — a wall, their last pierced enemy, or the edge of the map.</div>
+          <div><b>🛡 The Bunker — a top-down zone</b><br>South-east of town stands a fourth building: <b>the Bunker</b> (stand below it and press <span class="kbd">E</span>). It is a <b>zone chain like the factories</b> — 3 top-down maps, each about six fogged rooms on a grid. Down there is <b>no gravity and no jumping</b> — but the town <b>hop</b> works down here too (HOP button, <span class="kbd">Space</span>, or a tap on the right half of the stage), purely as a hop: it dodges no shots and clears no walls. The joystick or <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> moves in 8 directions, walls are solid, and the same autofire, mods, XP, physical drops and wreck rules apply (the Accuracy cone is the sites' cone, keyed off your total speed). Each map: a <b>battle room</b> ⚔️ that seals until its fabricator waves are cleared, a <b>branch fabricator</b> 🏭 (on the first two maps it guards a +2 ⚙️ cache), and a <b>guardian</b> 👹 — tougher on each deeper map — whose death opens the <b>portal</b> in its room: onward to the next map, or, on the final map, home with the zone complete. Only those two kills pay a mod choice, and mods and XP ride across the portals and are lost on death. The zone's one <b>Power Cell (+3 ⚙️)</b> waits on the <b>final map</b>, released by its guardian. Every map's entry room has a live <b>extraction exit</b> — bank the haul and end the run whenever you choose. The bunker zone keeps its layouts while a wreck or the cell is outstanding, and counts as cleared once the cell is banked.</div>
+          <div><b>⛏ Zones are chains of maps</b><br>A zone is <b>3 maps</b>. Each map has a <b>battle room</b> ⚔️ (doors seal until you clear the fabricator waves), a branch with a fabricator, and a crowned <b>miniboss</b> 👹 — its door is inert while it lives and opens on its death: onward to the next map, or, on the last map, zone complete. Each map also has an <b>extraction exit by its entry</b>: bank the haul and end the run, or push deeper. <b>Miniboss kills and branch fabricator kills pay a 1-of-3 mod choice</b> (Spread Shot, chain, piercing, homing, bounce — stacking, in-run only, carrying across map doors; reroll from the haul). Kills also pay <b>XP</b> toward automatic small boosts (spawner-born bots pay none). <b>All kill loot is physical</b>: it lands on the ground where things died and joins the haul only when you pick it up. Check what you're carrying any time with the 🎒 button or <span class="kbd">I</span>. Your jumps are a single budget of 2 per airborne stint: jumping off the ground spends one (leaving the classic double jump), but walking off a ledge, dropping through one, or getting knocked off spends none — both jumps are still yours in the air — and landing refills the budget. In Accuracy mode, jumping and falling widen your spread cone; a Spread Shot volley keeps its own wide fixed fan regardless — while moving, its centre shot takes the same cone deviation as any other shot (standing still it is exact), and the whole fan is pegged to that actually-fired centre direction, never to where you meant to aim. Your shots fly until they hit something — a wall, their last pierced enemy, or the edge of the map.</div>
         </div>
         <p class="small controls-long"><span class="kbd">A</span> <span class="kbd">D</span> / <span class="kbd">←</span> <span class="kbd">→</span> move &nbsp;•&nbsp; <span class="kbd">Space</span> / <span class="kbd">W</span> jump, tap again mid-air to double-jump &nbsp;•&nbsp; Hold <span class="kbd">S</span> / <span class="kbd">↓</span> on a thin teal ledge to drop through it &nbsp;•&nbsp; <span class="kbd">E</span> extract at an exit door / open the workshop in town &nbsp;•&nbsp; On touch: drag on the left half — the joystick appears under your thumb — pull it <b>down</b> to drop through a thin ledge, and tap JUMP on the right. Top-down there's no jumping — in town and in the Bunker that same button (or <span class="kbd">Space</span>, or a tap on the right half of the stage) is a <b>hop</b>: in town a short hop clean over rocks, trees and slimes; in the Bunker the same hop, with no dodge or wall-clearing in it.</p>
         <p class="small controls-short">Touch: drag on the left half — the joystick appears under your thumb — pull it down to drop through thin teal ledges, tap JUMP on the right (HOP top-down — over rocks, trees &amp; slimes in town), and tap EXTRACT at an exit door. Keyboard: <span class="kbd">A</span> <span class="kbd">D</span> move, <span class="kbd">Space</span> jump ×2 = double jump, hold <span class="kbd">S</span> to drop through, <span class="kbd">E</span> to extract / use the workshop.</p>
@@ -305,7 +332,9 @@ try{
 }catch(e){}
 var installEvt=null;
 window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();installEvt=e;document.getElementById('installBtn').style.display='';document.getElementById('installBtn2').style.display='';});
-function doInstall(){if(installEvt){installEvt['prompt']();installEvt.userChoice.then(function(){installEvt=null;});}}
+function doInstall(){if(!installEvt)return; var ev=installEvt; var showInstall=ev.prompt; // the deferred PWA install event's own method (not a dialog): call it on the event, as the API requires
+  if(typeof showInstall==='function')showInstall.call(ev);
+  if(ev.userChoice&&ev.userChoice.then)ev.userChoice.then(function(){installEvt=null;}); }
 document.getElementById('installBtn').addEventListener('click',doInstall);
 document.getElementById('installBtn2').addEventListener('click',doInstall);
 
@@ -425,10 +454,11 @@ function newRun(){
      runSeed:Math.floor(Math.random()*1000000000),
      bankScrap:30,bankComp:6,corpses:[],corpseSeq:0,spawnerStates:{},siteStates:{},botNum:1,botAlive:true,botCost:{s:0,c:0},botInstalls:[],
      bunkerSite:{seed:Math.floor(Math.random()*900000000)+1000,level:1,compTaken:false,clears:0},bunkerSave:null,nearBunker:false,
+     bkMapIdx:0,bkMaps:3,bunkerStates:{},nearInteract:null,
      unlocked:{plating:true,heavy:true,boots:true},unlocksEarned:0,townDone:{},
      zones:zones,
      mods:baseMods(),
-     player:null,world:null,camY:0,time:0,shake:0,nearPortal:false,nearWorkshop:false,overT:0,bolts:[],pendingBounces:[]};
+     player:null,world:null,camY:0,time:0,shake:0,nearPortal:false,nearWorkshop:false,nearDoorPrompt:null,overT:0,bolts:[],pendingBounces:[]};
 }
 newRun();
 
@@ -1519,7 +1549,7 @@ function enterOverworld(fromZoneIdx,hp){
   G.player=makeOWPlayer(px,py,hp);
   G.bullets=[]; G.eBullets=[]; G.parts=[]; G.texts=[]; G.bolts=[]; G.pendingBounces=[];
   G.owCd=1.4; G.camX=undefined; G.camY=Math.max(0,py-320);
-  G.nearPortal=false; G.nearWorkshop=false; G.nearShortcut=null;
+  G.nearPortal=false; G.nearWorkshop=false; G.nearShortcut=null; G.nearDoorPrompt=null;
   G.state='play';
   hideAll();
   document.getElementById('roomLabel').textContent='🏘️ Town — your base. The bot goes out; you stay here.';
@@ -1630,7 +1660,7 @@ function botDeath(cause){
   G.corpses.forEach(function(c){ c.age++; });
   G.corpses=G.corpses.filter(function(c){ return corpseTotal(c)>0; });
   if(G.bunkerSite&&G.bunkerSite.compTaken)maybeRerollBunker(); // a decayed-away bunker wreck frees the cleared site to re-roll
-  var corpse={id:++G.corpseSeq, site:(G.mode==='overworld'?-1:(G.mode==='bunker'?-2:G.zoneIdx)), mapIdx:(G.mode==='overworld'?-1:(G.mapIdx||0)), x:spot.x, y:spot.y, w:40, h:24,
+  var corpse={id:++G.corpseSeq, site:(G.mode==='overworld'?-1:(G.mode==='bunker'?-2:G.zoneIdx)), mapIdx:(G.mode==='overworld'?-1:(G.mapIdx||0)), bkMap:(G.mode==='bunker'?(G.bkMapIdx||0):undefined), x:spot.x, y:spot.y, w:40, h:24,
     fullInstS:G.botCost.s, fullInstC:G.botCost.c, fullCarS:G.coins, fullCarC:G.carriedComp, age:0, botNum:G.botNum};
   // in-run mods and XP boosts are LOST on death (the wreck holds only
   // installed parts + collected haul — never uncollected ground drops)
@@ -1649,6 +1679,7 @@ function botDeath(cause){
   updateHUD();
 }
 function collectCorpse(c){
+  if(G.nearInteract&&G.nearInteract.corpse===c)G.nearInteract=null;
   var v=corpseValues(c);
   G.corpses.splice(G.corpses.indexOf(c),1);
   burst(c.x+20,c.y+10,'#22d3ee',14,160); SFX.pick();
@@ -1662,13 +1693,27 @@ function collectCorpse(c){
   }
   updateHUD();
 }
-function checkCorpseTouch(siteIdx){
-  var p=G.player; if(!p||!G.botAlive)return;
+// WRECK RECOVERY IS A DELIBERATE ACTION (the door treatment): standing
+// on or crossing a wreck NEVER recovers it. This only FINDS the nearest
+// recoverable wreck in prompt range; the anchored RECOVER prompt — see
+// syncActPrompt — is what arms, and only tapping it, or E while it is
+// visible, collects — via collectCorpse, unchanged.
+function wreckPromptFor(siteIdx){
+  var p=G.player; if(!p||!G.botAlive)return null;
+  var best=null, bestD=118; // prompt range: close enough to read the wreck, never a walk-over trigger
   for(var i=0;i<G.corpses.length;i++){ var c=G.corpses[i];
     if(c.site!==siteIdx)continue;
     if(siteIdx>=0&&c.mapIdx!==undefined&&c.mapIdx!==(G.mapIdx||0))continue;
+    if(siteIdx===-2&&((c.bkMap===undefined||c.bkMap===null)?0:c.bkMap)!==(G.bkMapIdx||0))continue; // the wreck lies in the bunker map where the bot died (old saves: map 1)
     if(siteIdx>=0||siteIdx===-2){ var cSec=sectionIndexOfPoint(c.x+20,c.y+12); if(cSec>=0&&!secRevealed(cSec))continue; } // a wreck in a fogged section (or bunker room) is found when its section is
-    if(overlap(p,{x:c.x-8,y:c.y-16,w:c.w+16,h:c.h+22})){ collectCorpse(c); return; } }
+    var d=Math.hypot((p.x+p.w/2)-(c.x+20),(p.y+p.h/2)-(c.y+12));
+    if(d<bestD){ bestD=d; best=c; }
+  }
+  return best;
+}
+function wreckInteract(siteIdx){
+  var c=wreckPromptFor(siteIdx);
+  return c? {kind:'wreck',corpse:c,cx:c.x+20,topY:c.y,label:'♻ RECOVER'} : null;
 }
 // A site re-rolls ONLY once stripped: its component banked AND no wreck of
 // yours still lying in it. Until then the same layout (same seed) persists.
@@ -1825,9 +1870,30 @@ function updateOW(dt){
   // deliberate press (E / the button), exactly like the workshop menu
   var bkd=O.bunkerDoor;
   G.nearBunker = bkd ? (Math.abs((p.x+p.w/2)-(bkd.x+bkd.w/2))<80 && p.y>bkd.y+bkd.h-44 && p.y<bkd.y+bkd.h+96) : false;
-  checkCorpseTouch(-1);
-  // zone doors
-  if(G.owCd<=0){ for(var di=0;di<O.doors.length;di++){ if(overlap(p,O.doors[di].door)){ startZone(di); return; } } }
+  // SITE DOORS (factory zone doors + the Bunker): proximity only ARMS
+  // the anchored ENTER prompt — walking onto, across or standing on a
+  // door tile NEVER enters a site. Entry happens only through a tap on
+  // the visible prompt, or E while it is visible; see syncPrompt /
+  // enterDoorPrompt. The nearest door in range owns the prompt, so a
+  // tap always enters the door it is pegged to.
+  G.nearDoorPrompt=null;
+  var bestDoor=null, bestDoorD=Infinity;
+  O.doors.forEach(function(d,di2){
+    var dcx=d.door.x+d.door.w/2, dcy=d.door.y+d.door.h/2;
+    var inRange=Math.abs((p.x+p.w/2)-dcx)<95 && (p.y+p.h)>d.door.y-58 && p.y<d.door.y+d.door.h+105;
+    if(inRange){ var dist=Math.hypot((p.x+p.w/2)-dcx,(p.y+p.h/2)-dcy);
+      if(dist<bestDoorD){ bestDoorD=dist; bestDoor={kind:'zone',idx:di2,cx:dcx,topY:d.door.y,label:'🚪 ENTER '+((d.name||'FACTORY')+'').toUpperCase()}; } }
+  });
+  if(!bestDoor&&G.nearBunker&&bkd)bestDoor={kind:'bunker',idx:-2,cx:bkd.x+bkd.w/2,topY:bkd.door.y,label:'🛡 ENTER BUNKER'};
+  G.nearDoorPrompt=bestDoor;
+  // TOWN INTERACTABLES get the door treatment too: the workshop (and a
+  // town wreck) only ARM an anchored prompt in range — standing on or
+  // crossing them never opens or collects anything. A wreck in range
+  // outranks the workshop if both are near.
+  var owWreck=wreckInteract(-1);
+  if(owWreck)G.nearInteract=owWreck;
+  else if(G.nearWorkshop&&ws)G.nearInteract={kind:'workshop',cx:ws.x+ws.w/2,topY:ws.y+ws.h-55,label:'🔧 WORKSHOP'};
+  else G.nearInteract=null;
   // fx
   G.parts=G.parts.filter(function(pt){ pt.t+=dt; pt.x+=pt.vx*dt; pt.y+=pt.vy*dt; pt.vy+=300*dt; return pt.t<pt.life; });
   G.texts=G.texts.filter(function(t){ t.t+=dt; t.y-=34*dt; return t.t<t.life; });
@@ -1846,6 +1912,7 @@ function drawCorpses(siteIdx,camY,viewH){
   G.corpses.forEach(function(c){
     if(c.site!==siteIdx)return;
     if(siteIdx>=0&&c.mapIdx!==undefined&&c.mapIdx!==(G.mapIdx||0))return; // the wreck lies in the map where the bot died
+    if(siteIdx===-2&&((c.bkMap===undefined||c.bkMap===null)?0:c.bkMap)!==(G.bkMapIdx||0))return; // …or in the bunker map where the bot died (old saves: map 1)
     if(viewH!==undefined&&(c.y+c.h<camY-80||c.y>camY+viewH+80))return;
     var v=corpseValues(c);
     ctx.save(); ctx.translate(c.x,c.y);
@@ -1867,10 +1934,14 @@ function drawPlayerTop(p){
   var hz=p.hopZ||0;
   ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(0,15,15-Math.min(6,hz*0.22),6-Math.min(2.5,hz*0.09),0,0,Math.PI*2); ctx.fill();
   ctx.translate(0,-hz); // mid-hop the body rides above its shadow
-  // Accuracy-mode spread cone, same as in sites: drawn from the gun toward
-  // the current target whenever one is in range, width = live spread
+  // Accuracy-mode spread cone — CONE PARITY with the sidescroller: the
+  // identical wedge the site renderer draws (drawPlayer), same fill and
+  // stroke, same radius rule (max(90, min(aimDist+36, autoFireRange))),
+  // centred on the current aim line, half-angle = the live spread,
+  // which currentSpreadRad derives from TOTAL top-down speed magnitude
+  // exactly as the site path derives it from ground/air speed.
   if(p.spreadRad>0.005&&p.aimDist>0&&G.state==='play'){
-    var cR2=Math.max(80,Math.min(p.aimDist+30,(TUN.autoFireRange||560)));
+    var cR2=Math.max(90,Math.min(p.aimDist+36,(TUN.autoFireRange||560)));
     ctx.save(); ctx.rotate(p.aim);
     ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,cR2,-p.spreadRad,p.spreadRad); ctx.closePath();
     ctx.fillStyle='rgba(245,158,11,0.15)'; ctx.fill();
@@ -1888,6 +1959,16 @@ function drawPlayerTop(p){
   ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(p.face*3.5,-1+bob*0.4,1.8,0,Math.PI*2); ctx.fill();
   ctx.save(); ctx.rotate(p.aim); ctx.fillStyle='#1f2937'; ctx.fillRect(6,-3.5,24,7); ctx.fillStyle='#fbbf24'; ctx.fillRect(27,-2.5,5,5); ctx.restore();
   ctx.restore(); ctx.globalAlpha=1;
+  // the sidescroller's dashed aim line to the current target, drawn in
+  // world space exactly as drawPlayer draws it — cone parity includes
+  // the presentation, not just the numbers
+  var ft=G._fireTarget;
+  if(ft&&!ft.dead&&G.state==='play'){
+    ctx.strokeStyle='rgba(253,224,71,0.18)'; ctx.lineWidth=2; ctx.setLineDash([5,7]);
+    ctx.beginPath(); ctx.moveTo(p.x+p.w/2,p.y+p.h/2);
+    ctx.lineTo(ft._aimX!==undefined?ft._aimX:ft.x+ft.w/2, ft._aimY!==undefined?ft._aimY:ft.y+ft.h/2);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
 }
 function renderOW(){
   var O=G.ow,p=G.player; if(!O||!p)return;
@@ -2140,6 +2221,55 @@ window.addEventListener('touchend',function(e){ for(var i=0;i<e.changedTouches.l
 window.addEventListener('touchcancel',function(e){ for(var i=0;i<e.changedTouches.length;i++)jumpTouchOff(e.changedTouches[i].identifier); });
 window.addEventListener('mouseup',function(){ jumpTouchOff('mouse'); });
 
+// ---------- WHOLE-SURFACE right-half jump / hop ----------
+// The stage handler above only sees taps that land on the stage itself.
+// The reference behaviour is wider: ANY fresh touch or pointer press on
+// the right half of the game surface — including taps over the HUD bar
+// and other non-interactive screen areas — is a jump (sidescroller) or
+// hop (top-down) press. These listeners sit on #app (the whole surface)
+// and feed the SAME per-touch/per-pointer jumpTouch registry, so the
+// jump budget, the double jump, the hop and the indicator glow all
+// behave exactly as for a stage tap or the round button. Taps landing
+// on a real labelled interactive control (any button — pause, bag,
+// sound, menus, EXTRACT, the anchored door prompt — the minimap, an
+// overlay, a form field) are excluded: they perform that control's own
+// action and never also jump. Registration is per touch/pointer id, so
+// a right-side jump touch never disturbs a held left-side joystick
+// touch, and releasing either never clears the other (the stage's own
+// registration of the same touch id is idempotent in the registry).
+var appEl=document.getElementById('app');
+var lastTouchJumpAt=0;
+function surfaceJumpX(clientX){ var r=appEl.getBoundingClientRect(); return {rel:clientX-r.left, half:r.width/2}; }
+function isInteractiveTarget(t){ return !!(t&&t.closest&&t.closest('button,.overlay,#minimapWrap,#prompt,select,input,textarea,a')); }
+function surfaceJumpActive(){ return G.state==='play'&&(G.mode==='zone'||G.mode==='overworld'||G.mode==='bunker'); }
+appEl.addEventListener('touchstart',function(e){
+  if(!surfaceJumpActive())return;
+  for(var i=0;i<e.changedTouches.length;i++){ var t=e.changedTouches[i];
+    if(isInteractiveTarget(t.target))continue;
+    var sx=surfaceJumpX(t.clientX);
+    if(sx.rel>=sx.half){ jumpTouchOn(t.identifier); lastTouchJumpAt=Date.now(); } }
+},{passive:true});
+appEl.addEventListener('pointerdown',function(e){
+  if(!surfaceJumpActive())return;
+  if(isInteractiveTarget(e.target))return;
+  var sx=surfaceJumpX(e.clientX);
+  if(sx.rel<sx.half)return;
+  if(e.pointerType==='touch'||e.pointerType==='pen')jumpTouchOn('ptr'+e.pointerId);
+  else jumpTouchOn('mouse');
+});
+appEl.addEventListener('mousedown',function(e){
+  if(!surfaceJumpActive())return;
+  if(isInteractiveTarget(e.target))return;
+  // A compatibility mouse event trailing a real touch tap (browsers
+  // synthesise one after touchend) must not register as a second,
+  // separate jump press.
+  if(Date.now()-lastTouchJumpAt<800)return;
+  var sx=surfaceJumpX(e.clientX);
+  if(sx.rel>=sx.half)jumpTouchOn('mouse');
+});
+window.addEventListener('pointerup',function(e){ jumpTouchOff('ptr'+e.pointerId); if(e.pointerType!=='touch'&&e.pointerType!=='pen')jumpTouchOff('mouse'); });
+window.addEventListener('pointercancel',function(e){ jumpTouchOff('ptr'+e.pointerId); });
+
 function inputDown(){
   if(keys['s']||keys['arrowdown'])return true;
   if(joy.active&&joy.dy>0.55)return true;
@@ -2385,13 +2515,29 @@ function playerFire(p,cx,cy,dmgScale){
   // before. Full/Half/Off move-and-fire behaviour is unchanged.
   var halfRad=(TUN.spreadHalfAngleDeg===undefined?35:TUN.spreadHalfAngleDeg)*Math.PI/180;
   var midIdx=Math.floor((n-1)/2);
+  var offs=[]; for(var oi=0;oi<n;oi++)offs.push(n>1 ? -halfRad + 2*halfRad*(oi/(n-1)) : 0);
+  // SPREAD REFERENCE RULE: within one volley, the CENTRE projectile's
+  // ACTUAL fired direction is computed FIRST — the aim line plus
+  // whatever deviation this volley draws from the move-and-fire cone —
+  // and every side projectile's direction is that ACTUAL centre
+  // direction plus/minus its fan offset. Side shots are never pegged
+  // to the pre-deviation intended aim while the centre shot deviates.
+  // (Before this fix the jitter was added to the centre slot alone and
+  // the side slots were spawned at aim+offset — measured: with the
+  // cone open, side-minus-centre came out as offset-minus-jitter, off
+  // by exactly the centre's deviation.) For odd volleys the centre
+  // slot's own offset is 0, so its actual direction is aim+deviation;
+  // the general form below (reference = the designated centre slot's
+  // actual direction) also covers even volleys from Split Shot.
+  var volleyDev=p.spreadRad?(Math.random()*2-1)*p.spreadRad:0;
+  var refAng=p.aim+volleyDev+offs[midIdx]; // the centre projectile's ACTUAL direction
   for(var b=0;b<n;b++){
-    var off= n>1 ? -halfRad + 2*halfRad*(b/(n-1)) : 0;
-    var jit=(b===midIdx&&p.spreadRad)?(Math.random()*2-1)*p.spreadRad:0;
+    var off=offs[b]-offs[midIdx];
+    var ang=refAng+off;
     // Spread Shot damage: the centre projectile is full strength and
     // every side projectile flies at 75% damage.
     var dmgF= b===midIdx?1:0.75;
-    var nb=spawnBullet(cx+Math.cos(p.aim)*22,cy+Math.sin(p.aim)*22,p.aim+off+jit,true,m.damage*(TUN.playerDmgMult||1)*(dmgScale||1)*dmgF*rf2(0.9,1.1));
+    var nb=spawnBullet(cx+Math.cos(ang)*22,cy+Math.sin(ang)*22,ang,true,m.damage*(TUN.playerDmgMult||1)*(dmgScale||1)*dmgF*rf2(0.9,1.1));
     // homing is resolved PER PROJECTILE, never once for the volley:
     // no target is assigned here. Each projectile independently
     // acquires the nearest valid target TO ITSELF once its arming
@@ -2408,7 +2554,7 @@ function playerFire(p,cx,cy,dmgScale){
       nb.homingAge=0;
       var offPx=(TUN.homingOffsetPx===undefined?12:TUN.homingOffsetPx);
       nb.homingOffPx=(b-(n-1)/2)*offPx;
-      nb.homingPerpX=-Math.sin(p.aim); nb.homingPerpY=Math.cos(p.aim);
+      nb.homingPerpX=-Math.sin(refAng); nb.homingPerpY=Math.cos(refAng);
       nb.wbounceLeft=G.runMods?G.runMods.wbounce||0:0; // wall-Bounce ricochets left (Bounce mod)
       nb.wallBounces=0;
     }
@@ -2573,7 +2719,7 @@ function spawnerDropNow(sp){
 function spawnerSave(sp){
   if(G.mode!=='bunker'&&(G.zoneIdx===undefined||G.zoneIdx<0))return;
   if(!G.spawnerStates)G.spawnerStates={};
-  var skey= G.mode==='bunker'? 'BK' : mapKey(); // the bunker keeps its own fabricator ledger, independent of every zone
+  var skey= G.mode==='bunker'? bkSpawnerKey() : mapKey(); // each bunker map keeps its own fabricator ledger, independent of every zone and of the other bunker maps
   var zs=G.spawnerStates[skey]||(G.spawnerStates[skey]={});
   zs[sp.id]={hp:Math.max(0,sp.hp),dead:!!sp.dead,budgetLeft:sp.budgetLeft};
 }
@@ -2901,7 +3047,7 @@ function update(dt){
       if(G.currentSec===scp.secIdx)toast('⛏ Extraction shortcut ONLINE in this section — stand on the pad and press E to return to town and bank your haul.'); }
     if(scp.active&&overlap(p,{x:scp.x-14,y:scp.y-52,w:scp.w+28,h:64}))G.nearShortcut=scp;
   });
-  checkCorpseTouch(G.zoneIdx);
+  G.nearInteract=wreckInteract(G.zoneIdx); // a wreck in range arms its RECOVER prompt — walking over it does nothing
   // particles & texts
   G.parts=G.parts.filter(function(pt){ pt.t+=dt; pt.x+=pt.vx*dt; pt.y+=pt.vy*dt; pt.vy+=300*dt; return pt.t<pt.life; });
   G.texts=G.texts.filter(function(t){ t.t+=dt; t.y-=34*dt; return t.t<t.life; });
@@ -3667,6 +3813,127 @@ function drawEnemy(e){
   // hp bar
   if(e.hp<e.maxhp){ ctx.fillStyle='#000a'; ctx.fillRect(e.x,e.y-10,e.w,5); ctx.fillStyle='#ef4444'; ctx.fillRect(e.x,e.y-10,e.w*Math.max(0,e.hp/e.maxhp),5); }
 }
+// ---------- Top-down enemy art (the Bunker) ----------
+// Every enemy type drawn AS SEEN FROM ABOVE, so a Bunker fight reads
+// top-down the way the player bot and the fabricators already do:
+// hulls and body mass in plan view, tread bands on the ground movers,
+// a turret barrel that shows its facing, a flyer readable as AIRBORNE
+// (offset ground shadow + spinning rotors), the guardian scaled and
+// crowned in plan. The sidescroller appearances (drawEnemy) are
+// untouched — this renderer is used only by renderBunker. Damage
+// feedback carries over unchanged: the white hit flash, knockback is
+// positional (the body itself is shoved), and the same health bar
+// rides above the body whenever it is hurt.
+function drawEnemyTop(e){
+  var p=G.player;
+  var flash=e.flash>0;
+  var fa=p?Math.atan2((p.y+p.h/2)-(e.y+e.h/2),(p.x+p.w/2)-(e.x+e.w/2)):0; // facing: toward the player
+  ctx.save(); ctx.translate(e.x+e.w/2,e.y+e.h/2);
+  if(e.spawnT>0){ // materialising telegraph — same orange ring language as the sites
+    ctx.globalAlpha=0.45+Math.sin(G.time*22)*0.18;
+    ctx.strokeStyle='#ff6b1a'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(0,0,Math.max(e.w,e.h)/2+9+Math.sin(G.time*22)*3,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle='rgba(255,107,26,0.18)'; ctx.beginPath(); ctx.arc(0,0,Math.max(e.w,e.h)/2+4,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+  }
+  var W2=e.w/2, H2=e.h/2;
+  if(e.type==='flyer'){
+    // ground shadow first — offset down-right, detached from the body:
+    // the gap between shadow and hull is what says "airborne" from above
+    ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(11,15,W2*0.92,H2*0.62,0,0,Math.PI*2); ctx.fill();
+    // four rotors at the corners, spinning — translucent blur discs with
+    // a bright blade line sweeping through them
+    var ra=G.time*28+e.t*3;
+    [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(function(q){ var rx=q[0]*(W2+3), ry=q[1]*(H2-2);
+      ctx.fillStyle='rgba(221,214,254,0.20)'; ctx.beginPath(); ctx.arc(rx,ry,9,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='rgba(237,233,254,0.75)'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(rx-Math.cos(ra)*8,ry-Math.sin(ra)*8); ctx.lineTo(rx+Math.cos(ra)*8,ry+Math.sin(ra)*8); ctx.stroke();
+      ctx.fillStyle='#4c1d95'; ctx.beginPath(); ctx.arc(rx,ry,2.4,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='rgba(167,139,250,0.5)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(rx*0.45,ry*0.45); ctx.lineTo(rx,ry); ctx.stroke(); });
+    ctx.fillStyle=flash?'#fff':'#7c3aed'; ctx.beginPath(); ctx.ellipse(0,0,W2,H2-5,0,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=flash?'#fff':'#5b21b6'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(0,0,W2,H2-5,0,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle=flash?'#fff':'#c4b5fd'; ctx.beginPath(); ctx.arc(0,0,7,0,Math.PI*2); ctx.fill();
+    ctx.save(); ctx.rotate(fa); ctx.fillStyle=flash?'#fff':'#ddd6fe'; ctx.beginPath(); ctx.moveTo(W2-3,-4); ctx.lineTo(W2+6,0); ctx.lineTo(W2-3,4); ctx.closePath(); ctx.fill(); ctx.restore();
+  } else if(e.type==='turret'){
+    // plan-view turret: bolted square base plate, a rotating ring, and
+    // the barrel drawn at its true facing (it aims at the player)
+    ctx.fillStyle='#111827'; rr(-W2-3,-H2-3,e.w+6,e.h+6,7); ctx.fill();
+    ctx.fillStyle=flash?'#fff':'#64748b'; rr(-W2,-H2,e.w,e.h,6); ctx.fill();
+    ctx.strokeStyle='#0f172a'; ctx.lineWidth=2; rr(-W2,-H2,e.w,e.h,6); ctx.stroke();
+    ctx.fillStyle='#0f172a';
+    [[-W2+6,-H2+6],[W2-6,-H2+6],[-W2+6,H2-6],[W2-6,H2-6]].forEach(function(bp){ ctx.beginPath(); ctx.arc(bp[0],bp[1],2.2,0,Math.PI*2); ctx.fill(); });
+    ctx.strokeStyle='rgba(15,23,42,0.55)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,13,0,Math.PI*2); ctx.stroke();
+    ctx.save(); ctx.rotate(fa);
+    ctx.fillStyle='#111827'; ctx.fillRect(4,-3.5,21,7);
+    ctx.fillStyle='#fca5a5'; ctx.fillRect(22,-2.5,4,5);
+    ctx.restore();
+    ctx.fillStyle=flash?'#fff':'#f97316'; ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff7ed'; ctx.beginPath(); ctx.arc(0,0,4.2,0,Math.PI*2); ctx.fill();
+  } else if(e.type==='slime'){
+    // a blob from above: a near-circular mass with a pulsing squash, a
+    // pale gel core showing through, and both eye dots riding the side
+    // toward the player
+    var sq=1+Math.sin(e.t*6)*0.07;
+    ctx.scale(sq,1/sq);
+    ctx.fillStyle=flash?'#fff':'#65a30d'; ctx.beginPath(); ctx.ellipse(0,0,W2,H2-1,0,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(54,83,20,0.6)'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(0,0,W2,H2-1,0,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle='rgba(236,252,203,0.5)'; ctx.beginPath(); ctx.ellipse(-2,-2,W2*0.55,H2*0.5,0,0,Math.PI*2); ctx.fill();
+    var ex=Math.cos(fa), ey=Math.sin(fa), px2=-ey, py2=ex;
+    ctx.fillStyle='#ecfccb';
+    ctx.beginPath(); ctx.arc(ex*7+px2*6,ey*7+py2*6,3.6,0,Math.PI*2); ctx.arc(ex*7-px2*6,ey*7-py2*6,3.6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#365314';
+    ctx.beginPath(); ctx.arc(ex*8.5+px2*6,ey*8.5+py2*6,1.8,0,Math.PI*2); ctx.arc(ex*8.5-px2*6,ey*8.5-py2*6,1.8,0,Math.PI*2); ctx.fill();
+  } else {
+    // ground hulls in plan view, rotated to facing: walker, brute and
+    // the guardian share the language — tread bands along both flanks,
+    // a hull plate, and the type's mass/crown read from above
+    ctx.rotate(fa);
+    var isBoss=e.type==='miniboss', isBrute=e.type==='brute'||isBoss;
+    var hullC=flash?'#fff':(e.type==='walker'?'#dc2626':isBoss?'#7f1d1d':'#9a3412');
+    var darkC=flash?'#fff':(e.type==='walker'?'#450a0a':isBoss?'#450a0a':'#431407');
+    // tread bands (the ground contact) — dark strips with pale ticks
+    ctx.fillStyle=darkC;
+    rr(-W2,-H2,e.w,9,4); ctx.fill(); rr(-W2,H2-9,e.w,9,4); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.35)';
+    for(var tx2=-W2+5;tx2<W2-3;tx2+=9){ ctx.fillRect(tx2,-H2+2.5,3,4); ctx.fillRect(tx2,H2-6.5,3,4); }
+    if(isBrute){ // shoulder pads: armoured blocks on both flanks, forward
+      ctx.fillStyle=flash?'#fff':(isBoss?'#450a0a':'#7c2d12');
+      rr(W2-20,-H2-5,17,15,4); ctx.fill(); rr(W2-20,H2-10,17,15,4); ctx.fill();
+      ctx.fillStyle=flash?'#fff':'#fde68a'; // side horns at the front corners
+      ctx.beginPath(); ctx.moveTo(W2-4,-H2-2); ctx.lineTo(W2+6,-H2-9); ctx.lineTo(W2+3,-H2+3); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(W2-4,H2+2); ctx.lineTo(W2+6,H2+9); ctx.lineTo(W2+3,H2-3); ctx.closePath(); ctx.fill();
+    }
+    // hull plate
+    ctx.fillStyle=hullC; rr(-W2+2,-H2+7,e.w-4,e.h-14,isBoss?11:8); ctx.fill();
+    if(e.type==='walker'){ // back spikes, seen from above as a spiked rear rim + a low dome
+      ctx.fillStyle=flash?'#fff':'#991b1b';
+      for(var ws3=-1;ws3<=1;ws3++){ ctx.beginPath(); ctx.moveTo(-W2+3,ws3*10-5); ctx.lineTo(-W2-5,ws3*10); ctx.lineTo(-W2+3,ws3*10+5); ctx.closePath(); ctx.fill(); }
+      ctx.beginPath(); ctx.arc(-2,0,10,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.30)'; ctx.beginPath(); ctx.arc(-4,-3,4,0,Math.PI*2); ctx.fill();
+    }
+    if(isBrute&&!isBoss){ ctx.fillStyle=darkC; ctx.fillRect(-W2+2,-6,e.w-4,12);
+      ctx.strokeStyle='rgba(253,230,138,0.65)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-W2+9,0); ctx.lineTo(W2-9,0); ctx.stroke(); }
+    if(isBoss){ // the guardian: a crown of spikes ringing the forward rim
+      // and the ringed chest core, both readable in plan
+      ctx.fillStyle=flash?'#fff':'#991b1b'; rr(-W2+2,-H2+7,e.w-4,15,8); ctx.fill();
+      ctx.fillStyle='#f59e0b';
+      for(var cr3=-2;cr3<=2;cr3++){
+        var bx3=W2-8-Math.abs(cr3)*3, by3=cr3*(H2-12)/2;
+        ctx.beginPath(); ctx.moveTo(bx3-4,by3-4.5); ctx.lineTo(bx3+8,by3); ctx.lineTo(bx3-4,by3+4.5); ctx.closePath(); ctx.fill(); }
+      ctx.fillStyle=flash?'#fff':'#f97316'; ctx.beginPath(); ctx.arc(-2,0,13,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#ffedd5'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(-2,0,13,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle='#fff7ed'; ctx.beginPath(); ctx.arc(-2,0,5,0,Math.PI*2); ctx.fill();
+    }
+    // eyes at the front of the hull, looking down the facing line
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(W2-11,-6,3.8,0,Math.PI*2); ctx.arc(W2-11,6,3.8,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#111';
+    ctx.beginPath(); ctx.arc(W2-9.5,-6,1.9,0,Math.PI*2); ctx.arc(W2-9.5,6,1.9,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+  if(e.hp<e.maxhp){ ctx.fillStyle='#000a'; ctx.fillRect(e.x,e.y-10,e.w,5); ctx.fillStyle='#ef4444'; ctx.fillRect(e.x,e.y-10,e.w*Math.max(0,e.hp/e.maxhp),5); }
+}
 function drawSpawner(sp){
   // warm-up telegraph: a pulsing ring + light column at the spawn point,
   // so a fresh bot never simply appears on top of the player
@@ -3753,10 +4020,14 @@ function drawPlayer(p){
     ctx.strokeStyle='rgba(253,224,71,0.18)'; ctx.lineWidth=2; ctx.setLineDash([5,7]); ctx.beginPath(); ctx.moveTo(p.x+p.w/2,p.y+12); ctx.lineTo(t._aimX!==undefined?t._aimX:t.x+t.w/2,t._aimY!==undefined?t._aimY:t.y+t.h/2); ctx.stroke(); ctx.setLineDash([]); }
 }
 
-// ---------- THE BUNKER: one top-down run site (Step 3) ----------
-// ONE site, not a map chain: ~6 rooms on a real 2D grid, generated per
-// run with the same seeding discipline as zones, entered from town by a
-// deliberate button press. It shares the bot, hull, loadout, haul and
+// ---------- THE BUNKER: a top-down ZONE CHAIN (Step 3, finished) ----------
+// A chain of top-down maps matching the factory zones' structure:
+// maps-per-zone maps (default 3), each ~6 rooms on a real 2D grid,
+// generated per map with the same seeding discipline as zones, entered
+// from town by a deliberate button press. Each map's guardian is its
+// miniboss (same escalation by map index); its death activates the
+// guardian-room portal onward — or, on the final map, home with the
+// zone complete. It shares the bot, hull, loadout, haul and
 // scrap with the factory zones and runs under the same rules —
 // extraction at the entry exit (live from the start), keyed kills
 // (branch fabricator + guardian ONLY), XP, physical ground drops,
@@ -3764,10 +4035,21 @@ function drawPlayer(p){
 // (the uniform top-down HOP applies down here too, purely as a hop):
 // 8-way movement, solid walls, wall sliding, and the Accuracy cone
 // keyed off total speed magnitude (see moveFrac). Its persistence
-// (G.bunkerSite + G.bunkerSave + spawnerStates['BK'], wrecks at site
-// code -2) is fully independent of every factory zone's state.
+// (G.bunkerSite + per-map G.bunkerStates / spawnerStates['BK'+map]
+// slots, wrecks at site code -2 with a bkMap tag) is fully independent
+// of every factory zone's state; the old single-map G.bunkerSave /
+// 'BK' shapes are adopted into map 1's slots on load (see
+// restoreBunkerState).
 var BK_RW=760, BK_RH=520;
-function genBunker(seed,level){
+function genBunker(seed,level,mapIdx){
+  // STEP 3 FINISHED: the Bunker is a ZONE CHAIN of top-down maps, like
+  // the factory zones. The caller passes the zone seed already offset
+  // per map (zone seed + mapIdx*100003, the factory discipline), so
+  // map 1 of a persisting zone is generated by exactly the numbers the
+  // old single-map bunker used — old saves keep their first map.
+  mapIdx=mapIdx||0;
+  var bkMapsNow=Math.max(1,Math.round(TUN.mapsPerZone||3));
+  var bkFinal=mapIdx>=bkMapsNow-1;
   seedRng(seed*7919 + level*131 + 17); // the zones' seeding discipline
   var scaling=(TUN.siteLevelScaling===undefined?0.28:TUN.siteLevelScaling);
   var hpScale=(1+(level-1)*scaling)*(TUN.enemyHpMult||1);
@@ -3940,20 +4222,26 @@ function genBunker(seed,level){
       for(var cn=0;cn<3;cn++){ var cs=freeSpot(r,20,20,110); pickups.push({x:cs.x,y:cs.y,w:20,h:20,type:'coin',taken:false,bob:rf(0,6),secIdx:rooms.indexOf(r)}); }
     }
   });
-  // the branch fabricator and the +2 components cache it guards
+  // the branch fabricator (a keyed kill on every map) and — on the
+  // NON-FINAL maps only, as in factory maps — the +2 components cache
+  // it guards. The final map's branch holds no cache: its prize is the
+  // zone's one Power Cell.
   var branchRoom=rooms.filter(function(r){return r.branch})[0];
   var bFab=addFab(branchRoom, Math.max(0,Math.round(TUN.spawnerBudget===undefined?6:TUN.spawnerBudget)), true,false);
-  pickups.push({x:Math.min(branchRoom.x+branchRoom.w-70,bFab.x+bFab.w+14),y:bFab.y+8,w:22,h:22,type:'compDrop',amt:1,taken:false,bob:1,secIdx:rooms.indexOf(branchRoom),cache:true});
-  pickups.push({x:Math.max(branchRoom.x+40,bFab.x-38),y:bFab.y+8,w:22,h:22,type:'compDrop',amt:1,taken:false,bob:3,secIdx:rooms.indexOf(branchRoom),cache:true});
+  if(!bkFinal){
+    pickups.push({x:Math.min(branchRoom.x+branchRoom.w-70,bFab.x+bFab.w+14),y:bFab.y+8,w:22,h:22,type:'compDrop',amt:1,taken:false,bob:1,secIdx:rooms.indexOf(branchRoom),cache:true});
+    pickups.push({x:Math.max(branchRoom.x+40,bFab.x-38),y:bFab.y+8,w:22,h:22,type:'compDrop',amt:1,taken:false,bob:3,secIdx:rooms.indexOf(branchRoom),cache:true});
+  }
   // battle room fabricators: two machines, 5 bots each = the waves
   var battleRoom=rooms.filter(function(r){return r.battle})[0];
   addFab(battleRoom,5,false,true); addFab(battleRoom,5,false,true);
-  // the Power Cell: in the vault when there is one, else the guardian
-  // room — SEALED (locked) until the guardian dies and releases it
+  // the Power Cell: exactly ONE per Bunker ZONE, on the FINAL map
+  // only — in the vault when there is one, else the guardian room —
+  // SEALED (locked) until the final guardian dies and releases it
   var guardianRoom=rooms.filter(function(r){return r.minibossRoom})[0];
   var cellRoom= vaultRoom||guardianRoom;
   var compTakenNow=!!(G.bunkerSite&&G.bunkerSite.compTaken);
-  if(!compTakenNow){ var cellSpot=freeSpot(cellRoom,26,26,170);
+  if(bkFinal&&!compTakenNow){ var cellSpot=freeSpot(cellRoom,26,26,170);
     pickups.push({x:cellSpot.x,y:cellSpot.y,w:26,h:26,type:'cell',taken:false,bob:rf(0,6),secIdx:rooms.indexOf(cellRoom),locked:true}); }
   var roamRooms=rooms.filter(function(r){return !r.entry&&!r.battle&&!r.branch&&!r.minibossRoom&&!r.vault});
   if(roamRooms.length){ var hr=roamRooms[0], hs=freeSpot(hr,24,24,120); pickups.push({x:hs.x,y:hs.y,w:24,h:24,type:'heart',taken:false,bob:0,secIdx:rooms.indexOf(hr)}); }
@@ -3962,10 +4250,25 @@ function genBunker(seed,level){
   var start={x:entryRoom.x+entryRoom.w/2-17, y:entryRoom.y+entryRoom.h-180};
   var exitPad={x:start.x-11,y:start.y+70,w:56,h:14,secIdx:0};
   enemies.forEach(function(e,i){ e.foeId='f'+i; });
+  // the guardian's portal, in the guardian room: inert while the
+  // guardian lives, activated by its death (a keyed kill) — to the
+  // next map, or, on the final map, the completion portal that banks
+  // the haul and ends the zone. Placed last so map 1's rooms, walls
+  // and rosters stay byte-identical to the old single-map bunker.
+  var portalSpot=freeSpot(guardianRoom,46,46,170);
+  var bkPortal={x:portalSpot.x,y:portalSpot.y,w:46,h:46,secIdx:rooms.indexOf(guardianRoom)};
   return {w:(maxGx-minGx+1)*BK_RW, h:(maxGy-minGy+1)*BK_RH, plats:plats, enemies:enemies, spawners:spawners, pickups:pickups, chests:[], spikes:[], decors:decors,
-          portal:null, start:start, rooms:rooms.length, sections:rooms, critCount:rooms.length, cols:(maxGx-minGx+1), rows:(maxGy-minGy+1), edges:edges,
+          portal:bkPortal, bkMapIdx:mapIdx, bkFinal:bkFinal, start:start, rooms:rooms.length, sections:rooms, critCount:rooms.length, cols:(maxGx-minGx+1), rows:(maxGy-minGy+1), edges:edges,
           groundTop:entryRoom.floorY, battle:battleObj, shortcuts:[], topDown:true, entryIdx:0, exitPad:exitPad, segSize:0};
 }
+// Per-MAP bunker persistence: each map in the chain keeps its own
+// fog/roster/drops slot (G.bunkerStates['bk'+mapIdx]) and its own
+// fabricator ledger (G.spawnerStates['BK'+mapIdx]), exactly as factory
+// maps persist under their own map keys. Cleared guardians stay dead
+// and their portals stay open while the zone persists.
+function bkSlotKey(){ return 'bk'+(G.bkMapIdx||0); }
+function bkSpawnerKey(){ return 'BK'+(G.bkMapIdx||0); }
+function isFinalBkMap(){ return (G.bkMapIdx||0)>=(G.bkMaps||3)-1; }
 function saveBunkerState(){
   if(G.mode!=='bunker'||!G.world||!G.world.enemies)return;
   var foes={};
@@ -3974,11 +4277,22 @@ function saveBunkerState(){
   if(G.explored)Object.keys(G.explored).forEach(function(k){ if(G.explored[k])rev.push(parseInt(k,10)); });
   var dropsSave=[]; // uncollected kill drops persist per room; the branch cache is regenerated by the layout itself
   if(G.world.pickups)G.world.pickups.forEach(function(pk){ if(!pk.taken&&!pk.cache&&(pk.type==='scrapDrop'||pk.type==='compDrop'))dropsSave.push({x:pk.x,y:pk.y,type:pk.type,amt:pk.amt||1,secIdx:pk.secIdx}); });
-  G.bunkerSave={revealed:rev,foes:foes,drops:dropsSave};
+  if(!G.bunkerStates)G.bunkerStates={};
+  G.bunkerStates[bkSlotKey()]={revealed:rev,foes:foes,drops:dropsSave};
 }
 function restoreBunkerState(){
   var W=G.world; if(!W)return;
-  var saved=G.bunkerSave;
+  // OLD-SAVE MIGRATION: a save from the single-map bunker holds ONE
+  // un-keyed state object (G.bunkerSave: {revealed, foes, drops}) and
+  // possibly the un-keyed fabricator ledger 'BK'. The chain's map 1 is
+  // generated from the same seed by the same numbers, so that state is
+  // adopted verbatim as map 1's slot — banked resources are never
+  // touched, and the map's dead (guardian included) stay dead.
+  if(!G.bunkerStates)G.bunkerStates={};
+  if(!G.bunkerStates[bkSlotKey()]&&(G.bkMapIdx||0)===0&&G.bunkerSave){
+    G.bunkerStates[bkSlotKey()]=G.bunkerSave; G.bunkerSave=null;
+  }
+  var saved=G.bunkerStates[bkSlotKey()];
   G.explored={};
   if(!saved){ revealSection(W.entryIdx||0); return; } // fresh bunker: fogged except the entry room
   saved.revealed.forEach(function(ix){ if(W.sections[ix])G.explored[ix]=true; });
@@ -3995,36 +4309,94 @@ function restoreBunkerState(){
   if(mb&&mb.dead)W.pickups.forEach(function(pk){ if(pk.type==='cell')pk.locked=false; });
   if(saved.drops)saved.drops.forEach(function(d){ W.pickups.push({x:d.x,y:d.y,w:22,h:22,type:d.type,amt:d.amt||1,taken:false,bob:0,secIdx:d.secIdx}); });
 }
-// The bunker re-rolls ONLY once stripped: its Power Cell banked AND no
-// wreck of yours still lying in it — the same rule as a factory site.
+// The bunker ZONE re-rolls ONLY once stripped: its Power Cell banked
+// AND no wreck of yours still lying in it — the same rule as a factory
+// zone. Until then the whole chain persists: same seed, same per-map
+// state, cleared guardians dead, their portals open.
 function maybeRerollBunker(){
   var bs=G.bunkerSite; if(!bs||!bs.compTaken)return;
   if(G.corpses.some(function(c){return c.site===-2}))return;
   bs.seed=Math.floor(Math.random()*900000000)+1000; bs.level+=1; bs.compTaken=false;
-  G.bunkerSave=null;
-  if(G.spawnerStates)delete G.spawnerStates['BK'];
-  toast('🗺️ The Bunker is stripped and sealed off. A new bunker layout (Lv '+bs.level+') waits at the town door.');
+  G.bunkerSave=null; G.bunkerStates={};
+  if(G.spawnerStates)Object.keys(G.spawnerStates).forEach(function(k){ if(k.indexOf('BK')===0)delete G.spawnerStates[k]; });
+  toast('🗺️ The Bunker is stripped and sealed off. A new bunker zone (Lv '+bs.level+') waits at the town door.');
 }
-function startBunker(){
-  if(!G.botAlive){ toast('🤖 No working bot — build one at the workshop first.'); return; }
+// OLD-SAVE WRECKS: a corpse written by the single-map bunker has no
+// bkMap field — it belongs to map 1. If its resting place is not
+// inside any room of the (regenerated) first map, move it into the
+// entry room so it stays recoverable in the new chain.
+function sanitizeBunkerCorpses(){
+  var W=G.world; if(!W||!W.sections)return;
+  var entry=W.sections[W.entryIdx||0]; if(!entry)return;
+  G.corpses.forEach(function(c){
+    if(c.site!==-2)return;
+    var cm=(c.bkMap===undefined||c.bkMap===null)?0:c.bkMap;
+    if(cm!==(G.bkMapIdx||0))return;
+    if(sectionIndexOfPoint(c.x+20,c.y+12)<0){ c.x=entry.x+entry.w/2-20; c.y=entry.y+entry.h/2-12; }
+  });
+}
+function loadBkMap(idx){
   var bs=G.bunkerSite;
-  G.mode='bunker'; G.level=bs.level;
-  resetRunState();
-  G.world=genBunker(bs.seed, bs.level);
+  G.bkMapIdx=idx; G.level=bs.level;
+  G.world=genBunker(bs.seed + idx*100003, bs.level, idx); // the factory map-seed discipline
+  // guardian escalation by map index — the factory miniboss dials, verbatim
+  var escHp=[1,(TUN.mbHpEsc2===undefined?1.35:TUN.mbHpEsc2),(TUN.mbHpEsc3===undefined?1.75:TUN.mbHpEsc3)][Math.min(2,idx)]||1;
+  var escDmg=[1,(TUN.mbDmgEsc2===undefined?1.15:TUN.mbDmgEsc2),(TUN.mbDmgEsc3===undefined?1.3:TUN.mbDmgEsc3)][Math.min(2,idx)]||1;
+  G.world.enemies.forEach(function(e){ if(e.miniboss){ e.hp*=escHp; e.maxhp*=escHp; e.dmgMult=escDmg; } });
   var hpCarry=G.player?G.player.hp:undefined;
   G.player=makePlayer(G.world);
   if(hpCarry!==undefined)G.player.hp=Math.min(hpCarry,G.player.maxHp);
   G.bullets=[]; G.eBullets=[]; G.parts=[]; G.texts=[]; G.bolts=[]; G.pendingBounces=[];
   G.camX=undefined; G.camY=undefined;
   G.currentSec=G.world.entryIdx||0;
-  restoreBunkerState(); // fog + roster: fresh = only the entry room revealed; a persisting bunker keeps its dead where they fell
-  var savedSp=G.spawnerStates&&G.spawnerStates['BK'];
+  restoreBunkerState(); // fog + roster for THIS map: fresh = only its entry room revealed; a persisting map keeps its dead where they fell
+  if(!G.spawnerStates)G.spawnerStates={};
+  var spKey=bkSpawnerKey();
+  if(!G.spawnerStates[spKey]&&idx===0&&G.spawnerStates['BK']){ G.spawnerStates[spKey]=G.spawnerStates['BK']; delete G.spawnerStates['BK']; } // old-save ledger adoption
+  var savedSp=G.spawnerStates[spKey];
   if(savedSp)G.world.spawners.forEach(function(sp){ var sv=savedSp[sp.id]; if(sv){ sp.hp=sv.hp; sp.dead=!!sv.dead; sp.budgetLeft=sv.budgetLeft; } });
-  G.nearExit=false; G.nearPortal=false; G.nearShortcut=null;
+  sanitizeBunkerCorpses();
+  G.nearExit=false; G.nearPortal=false; G.nearShortcut=null; G.nearInteract=null;
   G.state='play';
   hideAll();
-  var nc=G.corpses.filter(function(c){return c.site===-2}).length;
-  toast('🛡 THE BUNKER (Lv '+bs.level+') — top-down: no jumping down here, but HOP (button / Space / right-side tap) is the town hop, purely a hop. Same gun, mods, XP and drops. The 🔋 Power Cell waits behind the guardian 👹; the ⛏ extraction exit in this entry room is live from the start.'+(nc?' ♻ '+nc+' wreck'+(nc>1?'s':'')+' in the bunker.':''));
+  var nc=G.corpses.filter(function(c){return c.site===-2&&((c.bkMap===undefined||c.bkMap===null)?0:c.bkMap)===idx}).length;
+  toast('🛡 THE BUNKER (Lv '+bs.level+') — MAP '+(idx+1)+' OF '+(G.bkMaps||3)+'. Top-down: HOP (button / Space / right-side tap) is the town hop, purely a hop. Kill this map\u2019s guardian 👹 to open its portal '+(isFinalBkMap()?'home — the 🔋 Power Cell waits on this map, behind the guardian.':'onward. The 🔋 Power Cell waits on the final map.')+' The ⛏ extraction exit in this entry room is live from the start.'+(nc?' ♻ '+nc+' wreck'+(nc>1?'s':'')+' on this map.':''));
+  updateHUD();
+}
+function startBunker(){
+  if(!G.botAlive){ toast('🤖 No working bot — build one at the workshop first.'); return; }
+  var bs=G.bunkerSite;
+  G.mode='bunker';
+  G.bkMaps=Math.max(1,Math.round(TUN.mapsPerZone||3));
+  if(bs.compTaken)maybeRerollBunker(); // a stripped zone with no wreck outstanding re-rolls on entry, as factory zones do
+  resetRunState();
+  loadBkMap(0); // every run enters at map 1 — mods/XP from a previous run do not carry in, and a death re-enters here too
+}
+function goNextBkMap(){
+  saveBunkerState();
+  var hpNow=G.player.hp;
+  loadBkMap((G.bkMapIdx||0)+1);
+  if(G.player)G.player.hp=Math.min(hpNow,G.player.maxHp);
+  toast('🗺️ MAP '+((G.bkMapIdx||0)+1)+' OF '+(G.bkMaps||3)+' — your mods ride with you: '+modSummaryText()+'. Press 🎒 / I any time to check them.');
+  updateHUD();
+}
+function completeBunkerZone(){
+  // the final map's completion portal: banks the haul like an
+  // extraction and marks the Bunker zone cleared — the factory
+  // completeZone shape, top-down
+  saveBunkerState();
+  var bs=G.bunkerSite, gotBk=G.player.hasCell;
+  var sb=G.coins, cb=G.carriedComp;
+  G.bankScrap+=sb; G.bankComp+=cb; G.coins=0; G.carriedComp=0;
+  if(gotBk){ bs.compTaken=true; }
+  bs.clears=(bs.clears||0)+1;
+  earnUnlock();
+  var hpNow=G.player.hp;
+  SFX.win();
+  resetRunState();
+  enterOverworld(-2,hpNow);
+  toast('🏆 BUNKER ZONE COMPLETE — the chain is cleared! Banked +🔩'+sb+' scrap +⚙️'+cb+' comp.'+(gotBk?' Power Cell secured.':''));
+  maybeRerollBunker();
   updateHUD();
 }
 // Axis-separated top-down movement with sub-stepping: a body moves one
@@ -4161,9 +4533,9 @@ function updateBunker(dt){
       if(d>110){ e.vx=dx/d*40*spM; e.vy=dy/d*40*spM; } else { e.vx=0; e.vy=0; }
       tdMove(e,dt,solids);
       e.fireT-=dt;
-      if(e.fireT<=0&&d<640){ e.fireT=Math.max(0.85,(e.hp<e.maxhp*0.5?1.7:2.3)/(TUN.enemyFireMult||1)); spawnBullet(ecx,ecy,Math.atan2(dy,dx),false,(11+G.level)*(TUN.enemyDmgMult||1)); }
+      if(e.fireT<=0&&d<640){ e.fireT=Math.max(0.85,(e.hp<e.maxhp*0.5?1.7:2.3)/(TUN.enemyFireMult||1)); spawnBullet(ecx,ecy,Math.atan2(dy,dx),false,(11+G.level)*(TUN.enemyDmgMult||1)*(e.dmgMult||1)); } // dmgMult = this map's guardian escalation, set in loadBkMap
     }
-    if(overlap(p,e))hurtPlayer((e.type==='miniboss'?20 : e.type==='brute'?16 : 10)*(TUN.enemyDmgMult||1));
+    if(overlap(p,e))hurtPlayer((e.type==='miniboss'?20 : e.type==='brute'?16 : 10)*(TUN.enemyDmgMult||1)*(e.miniboss?(e.dmgMult||1):1));
   });
   if(G.state!=='play')return; // contact ended the run
   updateSpawners(dt);
@@ -4240,8 +4612,11 @@ function updateBunker(dt){
   // the extraction exit, by the entry spawn: live from the start,
   // leaving is a deliberate press (see interact / syncPrompt)
   G.nearExit= W.exitPad? overlap(p,{x:W.exitPad.x-16,y:W.exitPad.y-36,w:W.exitPad.w+32,h:W.exitPad.h+56}) : false;
-  G.nearPortal=false; G.nearShortcut=null;
-  checkCorpseTouch(-2);
+  // the guardian's portal: proximity only ARMS its prompt — crossing
+  // its tile never takes it; the deliberate press (E / the button) does
+  G.nearPortal= W.portal? overlap(p,{x:W.portal.x-14,y:W.portal.y-14,w:W.portal.w+28,h:W.portal.h+28}) : false;
+  G.nearShortcut=null;
+  G.nearInteract=wreckInteract(-2); // a wreck in range arms its RECOVER prompt — walking over it does nothing
   if(G.overT>0)G.overT-=dt;
   if(W.unlockFx>0)W.unlockFx=Math.max(0,W.unlockFx-dt);
   G.parts=G.parts.filter(function(pt){ pt.t+=dt; pt.x+=pt.vx*dt; pt.y+=pt.vy*dt; pt.vy+=300*dt; return pt.t<pt.life; });
@@ -4325,6 +4700,39 @@ function renderBunker(){
     ctx.fillStyle='#cffafe'; ctx.font='800 11px system-ui'; ctx.textAlign='center';
     ctx.fillText('⛏ EXTRACT — E: TOWN', epcx, ep.y-24); ctx.textAlign='left';
   }
+  // the guardian's portal, in the guardian room — the map door in plan
+  // view, in the portal family's own two-state language: SEALED while
+  // the guardian lives (dark slate ring, lock diamond, no glow), OPEN
+  // on its death (the brightest ring in the building, with the unlock
+  // ignition flash the factory door gets)
+  if(W.portal){ var bp2=W.portal, bcx2=bp2.x+bp2.w/2, bcy2=bp2.y+bp2.h/2, bAlive=minibossAliveInMap();
+    if(bAlive){
+      ctx.fillStyle='#0a141b'; ctx.beginPath(); ctx.arc(bcx2,bcy2,30,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#3d5a68'; ctx.lineWidth=4; ctx.beginPath(); ctx.arc(bcx2,bcy2,30,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle='#132730'; ctx.beginPath(); ctx.arc(bcx2,bcy2,24,0,Math.PI*2); ctx.fill();
+      ctx.save(); ctx.translate(bcx2,bcy2); ctx.rotate(Math.PI/4);
+      ctx.fillStyle='#8fb8c7'; ctx.fillRect(-7,-7,14,14); ctx.fillStyle='#132730'; ctx.fillRect(-3.5,-3.5,7,7); ctx.restore();
+      ctx.fillStyle='#8fb8c7'; ctx.font='800 10px system-ui'; ctx.textAlign='center'; ctx.fillText('SEALED — GUARDIAN LIVES',bcx2,bcy2+44); ctx.textAlign='left';
+    } else {
+      ctx.fillStyle='rgba(34,211,238,'+(0.15+Math.sin(G.time*5)*0.05)+')';
+      ctx.beginPath(); ctx.arc(bcx2,bcy2,44,0,Math.PI*2); ctx.fill();
+      ctx.save(); ctx.translate(bcx2,bcy2); var bpu=1+Math.sin(G.time*4)*0.05; ctx.scale(bpu,bpu);
+      ctx.strokeStyle='rgba(34,211,238,0.45)'; ctx.lineWidth=10; ctx.beginPath(); ctx.arc(0,0,27,0,Math.PI*2); ctx.stroke();
+      ctx.strokeStyle='#22d3ee'; ctx.lineWidth=6; ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle='rgba(34,211,238,0.28)'; ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#ffffff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,15,0,Math.PI*2); ctx.stroke();
+      ctx.restore();
+      if(W.unlockFx>0){ var ufp2=1-W.unlockFx/0.9;
+        ctx.save(); ctx.globalAlpha=Math.max(0,(1-ufp2))*0.5; ctx.fillStyle='#ecfeff';
+        ctx.beginPath(); ctx.arc(bcx2,bcy2,32,0,Math.PI*2); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(bcx2,bcy2);
+        ctx.strokeStyle='rgba(165,243,252,'+(0.85*(1-ufp2)).toFixed(3)+')'; ctx.lineWidth=3;
+        ctx.beginPath(); ctx.arc(0,0,27+ufp2*40,0,Math.PI*2); ctx.stroke(); ctx.restore();
+      }
+      ctx.fillStyle='#cffafe'; ctx.font='800 11px system-ui'; ctx.textAlign='center';
+      ctx.fillText(W.bkFinal? 'COMPLETION PORTAL — E: COMPLETE THE ZONE' : 'PORTAL OPEN — E: NEXT MAP', bcx2, bcy2-40); ctx.textAlign='left';
+    }
+  }
   platsDraw(W); // walls, crates, and any sealed battle barriers (energy style)
   drawBunkerDoorways(W,camX,camY,viewW,viewH,false);
   drawCorpses(-2,camY,viewH);
@@ -4388,7 +4796,7 @@ function renderBunker(){
       }
     }
   });
-  W.enemies.forEach(function(e){ if(e.dead||e.dormant||!visB(e))return; drawEnemy(e); });
+  W.enemies.forEach(function(e){ if(e.dead||e.dormant||!visB(e))return; drawEnemyTop(e); });
   if(W.spawners)W.spawners.forEach(function(sp){ if(!visB(sp)&&!(sp.warmup>0))return; drawSpawner(sp); });
   G.bullets.forEach(function(b){ drawBullet(b,true); });
   G.eBullets.forEach(function(b){ drawBullet(b,false); });
@@ -4413,7 +4821,8 @@ function renderBunker(){
   if(G.state==='play'&&p){
     var tgt=null,tIc='';
     if(!p.hasCell){ for(var pi=0;pi<W.pickups.length;pi++){ if(W.pickups[pi].type==='cell'&&!W.pickups[pi].taken){ tgt={x:W.pickups[pi].x+13,y:W.pickups[pi].y+13,sec:W.pickups[pi].secIdx}; tIc='🔋'; break; } } }
-    else if(W.exitPad){ tgt={x:W.exitPad.x+W.exitPad.w/2,y:W.exitPad.y+W.exitPad.h/2,sec:W.exitPad.secIdx}; tIc='⛏'; }
+    if(!tgt&&W.portal&&!minibossAliveInMap()){ tgt={x:W.portal.x+W.portal.w/2,y:W.portal.y+W.portal.h/2,sec:W.portal.secIdx}; tIc='🚪'; }
+    else if(!tgt&&p.hasCell&&W.exitPad){ tgt={x:W.exitPad.x+W.exitPad.w/2,y:W.exitPad.y+W.exitPad.h/2,sec:W.exitPad.secIdx}; tIc='⛏'; }
     if(tgt&&(tgt.sec===undefined||tgt.sec<0||secRevealed(tgt.sec))){
       var tsx=(tgt.x-camX)*scale, tsy=(tgt.y-camY)*scale;
       if(tsx<-10||tsx>VW+10||tsy<-10||tsy>VH+10){
@@ -4428,7 +4837,76 @@ function renderBunker(){
 }
 
 // ---------- Interact / prompt ----------
+function enterDoorPrompt(){
+  if(G.state!=='play'||G.mode!=='overworld'||!G.nearDoorPrompt)return;
+  var nd=G.nearDoorPrompt; G.nearDoorPrompt=null;
+  var dp=$('doorPrompt'); if(dp)dp.classList.remove('show');
+  if(nd.kind==='bunker')startBunker(); else startZone(nd.idx);
+}
+function syncDoorPrompt(){
+  var dp=$('doorPrompt'); if(!dp)return;
+  var nd=(G.state==='play'&&G.mode==='overworld')?G.nearDoorPrompt:null;
+  if(!nd||!G.ow){ dp.classList.remove('show'); return; }
+  // Pegged to the door: recompute the screen position from the door's
+  // world coordinates EVERY frame, using the same camera transform as
+  // renderOW, at a constant offset above the door (centred on the
+  // door's centre x, 10px above the door's top edge). If the camera
+  // moves while the bot stays in range, the prompt moves with the door.
+  var O=G.ow, vm=viewMetrics(), scale=vm.scale;
+  var camX=Math.max(0,Math.min(O.w-vm.w,(G.camX!==undefined?G.camX:O.w/2-vm.w/2)));
+  var camY=Math.max(0,Math.min(O.h-vm.h,G.camY||0));
+  dp.textContent=nd.label;
+  dp.style.left=((nd.cx-camX)*scale)+'px';
+  dp.style.top=((nd.topY-camY)*scale-10)+'px';
+  dp.classList.add('show');
+}
+// ---------- Anchored interact prompt — the door treatment, generalised ----------
+// ONE mechanism for every deliberate interactable that is not a town
+// site door: the workshop and town stations, and wreck recovery in
+// town, in factory sites and in the Bunker. G.nearInteract is recomputed
+// every frame by the mode updates ({kind, cx, topY, label, ...} in WORLD
+// coordinates); this sync repositions the prompt button from those
+// coordinates EVERY frame at a constant offset above the anchor, using
+// the same camera transform as the mode's renderer — so while the
+// camera moves, the button stays pegged to its interactable, and out
+// of range (nearInteract null) it is gone. Standing on or crossing the
+// interactable never activates it: only a tap on this visible button,
+// or E while it is visible, does.
+function interactScreenPos(ni){
+  var vm=viewMetrics(), scale=vm.scale, camX, camY;
+  if(G.mode==='overworld'){ var O=G.ow; if(!O)return null;
+    camX=Math.max(0,Math.min(O.w-vm.w,(G.camX!==undefined?G.camX:O.w/2-vm.w/2)));
+    camY=Math.max(0,Math.min(O.h-vm.h,G.camY||0));
+  } else if(G.mode==='bunker'){ var W=G.world; if(!W||!G.player)return null;
+    camX=Math.max(0,Math.min(Math.max(0,W.w-vm.w),(G.camX!==undefined?G.camX:G.player.x+G.player.w/2-vm.w/2)));
+    camY=Math.max(0,Math.min(Math.max(0,W.h-vm.h),(G.camY!==undefined?G.camY:G.player.y+G.player.h/2-vm.h/2)));
+  } else { var W2=G.world; if(!W2)return null;
+    camX=Math.max(0,Math.min(W2.w-vm.w,(G.camX!==undefined?G.camX:(W2.w-vm.w)/2)));
+    camY=Math.max(0,Math.min(W2.h-vm.h,G.camY||0));
+  }
+  return {x:(ni.cx-camX)*scale, y:(ni.topY-camY)*scale-10};
+}
+function syncActPrompt(){
+  var ap=$('actPrompt'); if(!ap)return;
+  var ni=(G.state==='play')?G.nearInteract:null;
+  if(!ni){ ap.classList.remove('show'); return; }
+  var pt=interactScreenPos(ni);
+  if(!pt){ ap.classList.remove('show'); return; }
+  ap.textContent=ni.label;
+  ap.style.left=pt.x+'px';
+  ap.style.top=pt.y+'px';
+  ap.classList.add('show');
+}
+function activateInteract(){
+  if(G.state!=='play'||!G.nearInteract)return;
+  var ni=G.nearInteract; G.nearInteract=null;
+  var ap=$('actPrompt'); if(ap)ap.classList.remove('show');
+  if(ni.kind==='workshop')openWorkshop();
+  else if(ni.kind==='wreck'&&ni.corpse)collectCorpse(ni.corpse);
+}
 function syncPrompt(){
+  syncDoorPrompt();
+  syncActPrompt();
   var pr=$('prompt'), ex=$('exitBtn');
   // the big round button is JUMP inside a sidescroller site, HOP in
   // ALL top-down play (town and Bunker alike) — one verb, one live
@@ -4448,32 +4926,66 @@ function syncPrompt(){
   } else if(G.mode==='zone'&&G.nearShortcut){
     pr.textContent='⛏ SEGMENT CLEARED — extraction shortcut active. Press E or tap to return to town and bank your haul (🔩'+G.coins+' ⚙️'+G.carriedComp+').';
     pr.classList.add('show'); ex.textContent='⛏ SHORTCUT — RETURN TO TOWN'; ex.classList.add('show');
+  } else if(G.mode==='bunker'&&G.nearPortal){
+    if(minibossAliveInMap()){ pr.textContent='🚪 GUARDIAN PORTAL — inert while this map\u2019s guardian lives. Kill it to open the way on.'; pr.classList.add('show'); ex.classList.remove('show'); }
+    else { pr.textContent= isFinalBkMap()? '🚪 COMPLETION PORTAL — press E to COMPLETE THE BUNKER ZONE and bank your haul (🔩'+G.coins+' ⚙️'+G.carriedComp+').' : '🚪 PORTAL OPEN — press E to go to MAP '+((G.bkMapIdx||0)+2)+' OF '+(G.bkMaps||3)+'. Your mods, XP boosts and haul ride with you.';
+      pr.classList.add('show'); ex.textContent= isFinalBkMap()? '🏆 COMPLETE ZONE' : '🚪 TO MAP '+((G.bkMapIdx||0)+2); ex.classList.add('show'); }
   } else if(G.mode==='bunker'&&G.nearExit){
     pr.textContent='⛏ EXTRACTION EXIT — press E or tap EXTRACT to return to town and bank your haul (🔩'+G.coins+' ⚙️'+G.carriedComp+'). The run (and its mods) ends.';
     pr.classList.add('show'); ex.textContent='⛏ EXTRACT — RETURN TO TOWN'; ex.classList.add('show');
-  } else if(G.mode==='overworld'&&G.nearBunker){
-    pr.textContent='🛡 THE BUNKER — a top-down site: HOP not jump, 8-way movement, the same gun, mods, XP and wreck rules. Press E or tap here to send the bot down.';
-    pr.classList.add('show'); ex.textContent='🛡 ENTER THE BUNKER'; ex.classList.add('show');
-  } else if(G.mode==='overworld'&&G.nearWorkshop){
-    pr.textContent='🔧 TOWN WORKSHOP — press E or tap here to build / rebuild a bot and fix up the town.';
-    pr.classList.add('show'); ex.textContent='🔧 OPEN WORKSHOP'; ex.classList.add('show');
+  } else if(G.mode==='overworld'&&G.nearDoorPrompt){
+    // A site door is in range: the anchored ENTER prompt above the door
+    // (see syncDoorPrompt) is the control — no centred bottom button.
+    pr.classList.remove('show'); ex.classList.remove('show');
+  } else if(G.mode==='overworld'&&G.nearInteract){
+    // The workshop / a town wreck is in range: the anchored prompt
+    // above it (see syncActPrompt) is the control — no centred button.
+    pr.classList.remove('show'); ex.classList.remove('show');
   } else { pr.classList.remove('show'); ex.classList.remove('show'); }
+}
+function portalExitInteract(){
+  // the portal / extraction actions behind the centred prompt and the
+  // big bottom button — deliberately separate from the anchored
+  // prompts, so tapping EXTRACT can never spend itself on a wreck
+  if(G.mode==='zone'&&G.nearPortal){
+    if(minibossAliveInMap()){ toast('🚪 The map door is inert — this map\u2019s miniboss still lives.'); return true; }
+    if(isFinalMap())completeZone(); else goNextMap();
+    return true;
+  }
+  if(G.mode==='zone'&&(G.nearExit||G.nearShortcut)){ extract(); return true; }
+  if(G.mode==='bunker'&&G.nearPortal){
+    if(minibossAliveInMap()){ toast('🚪 The portal is inert — this map\u2019s guardian still lives.'); return true; }
+    if(isFinalBkMap())completeBunkerZone(); else goNextBkMap();
+    return true;
+  }
+  if(G.mode==='bunker'&&G.nearExit){ extract(); return true; }
+  return false;
 }
 function interact(){
   if(G.state!=='play')return;
-  if(G.mode==='zone'&&G.nearPortal){
-    if(minibossAliveInMap()){ toast('🚪 The map door is inert — this map\u2019s miniboss still lives.'); return; }
-    if(isFinalMap())completeZone(); else goNextMap();
-  }
-  else if(G.mode==='zone'&&(G.nearExit||G.nearShortcut))extract();
-  else if(G.mode==='bunker'&&G.nearExit)extract();
-  else if(G.mode==='overworld'&&G.nearBunker)startBunker();
-  else if(G.mode==='overworld'&&G.nearWorkshop)openWorkshop();
+  // E is the keyboard equivalent of whichever anchored prompt is
+  // visible: a town site door first, then the generalised interact
+  // prompt — workshop / wreck recovery — then the portal/exit actions.
+  if(G.mode==='overworld'&&G.nearDoorPrompt){ enterDoorPrompt(); return; }
+  if(G.nearInteract){ activateInteract(); return; }
+  if(portalExitInteract())return;
+  if(G.mode==='overworld'&&G.nearBunker)startBunker();
 }
-$('exitBtn').addEventListener('click',interact);
+$('exitBtn').addEventListener('click',function(){ if(G.state==='play')portalExitInteract(); });
 // Touch: act on touch-down and keep the tap away from the stage joystick
 // handler entirely (its preventDefault used to eat this button's click).
-$('exitBtn').addEventListener('touchstart',function(e){ e.preventDefault(); e.stopPropagation(); interact(); },{passive:false});
+$('exitBtn').addEventListener('touchstart',function(e){ e.preventDefault(); e.stopPropagation(); if(G.state==='play')portalExitInteract(); },{passive:false});
+// The anchored interact prompt: tapping/clicking IT (and only it, or E
+// while it is visible) fires its interactable. It is a <button>, so the
+// stage joystick and right-half jump handlers leave its taps alone.
+$('actPrompt').addEventListener('click',function(e){ e.stopPropagation(); activateInteract(); });
+$('actPrompt').addEventListener('touchstart',function(e){ e.preventDefault(); e.stopPropagation(); activateInteract(); },{passive:false});
+// The anchored door prompt: tapping/clicking IT (and only it, or E while
+// it is visible) enters the door it is pegged to. It is a <button>, so
+// the stage joystick handler and the right-half jump handlers below all
+// leave its taps alone — a prompt tap never also jumps.
+$('doorPrompt').addEventListener('click',function(e){ e.stopPropagation(); enterDoorPrompt(); });
+$('doorPrompt').addEventListener('touchstart',function(e){ e.preventDefault(); e.stopPropagation(); enterDoorPrompt(); },{passive:false});
 
 // ---------- Mod choices (KEYED KILLS only: minibosses + branch fabricators) ----------
 var MOD_POOL=[
@@ -4562,7 +5074,7 @@ function openBag(){
 function renderBag(){
   var d=inventoryData(), el=$('bagBody'), h='';
   if(d.inRun){
-    h+='<div class="stats"><span class="pill">'+(G.mode==='bunker'?'🛡 The Bunker — one top-down site':'🗺️ '+d.zoneName+' — Map '+d.mapIdx+' of '+d.mapsPerZone)+'</span><span class="pill">👹 '+(G.mode==='bunker'?'The guardian':'This map\u2019s miniboss')+': '+(d.minibossDown?'DOWN ✓':'alive')+'</span></div>';
+    h+='<div class="stats"><span class="pill">'+(G.mode==='bunker'?'🛡 The Bunker — Map '+((G.bkMapIdx||0)+1)+' of '+(G.bkMaps||3):'🗺️ '+d.zoneName+' — Map '+d.mapIdx+' of '+d.mapsPerZone)+'</span><span class="pill">👹 '+(G.mode==='bunker'?'This map\u2019s guardian':'This map\u2019s miniboss')+': '+(d.minibossDown?'DOWN ✓':'alive')+'</span></div>';
     h+='<h3 style="margin:14px 0 4px">🎁 In-run mods (lost on death / run end)</h3>';
     var any=false;
     d.mods.forEach(function(m){ if(m.stacks>0){ any=true; h+='<div class="proj"><div><h4>'+m.name+' '+roman(m.stacks)+' — ×'+m.stacks+'</h4><p>'+m.desc+'</p></div></div>'; } });
@@ -4804,8 +5316,8 @@ function updateHUD(light){
   }
   if(G.mode==='bunker'){
     $('carryText').textContent='🔩'+G.coins+' ⚙️'+G.carriedComp+(p.hasCell?' 🔋':'');
-    $('levelText').textContent='The Bunker Lv '+(G.bunkerSite?G.bunkerSite.level:1)+' • top-down'+(modSummaryText()!=='no mods yet'?' • '+modSummaryText():'');
-    $('cellText').textContent= p.hasCell? 'Power Cell aboard — back to the entry exit!' : (G.bunkerSite&&G.bunkerSite.compTaken? 'Power Cell banked ✓ — scrap & wrecks remain' : 'Find the Power Cell — behind the guardian');
+    $('levelText').textContent='The Bunker Lv '+(G.bunkerSite?G.bunkerSite.level:1)+' • Map '+((G.bkMapIdx||0)+1)+'/'+(G.bkMaps||3)+' • top-down'+(modSummaryText()!=='no mods yet'?' • '+modSummaryText():'');
+    $('cellText').textContent= p.hasCell? 'Power Cell aboard — extract, or complete the zone at the portal!' : (G.bunkerSite&&G.bunkerSite.compTaken? 'Power Cell banked ✓ — scrap & wrecks remain' : (isFinalBkMap()? 'Find the Power Cell — behind this map\u2019s guardian' : 'Kill the guardian, take its portal deeper — the Power Cell is on the final map'));
     $('cellPill').className='pill '+(p.hasCell?'cell-on':'cell-off');
     var leftB=G.world?G.world.enemies.filter(function(e){return !e.dead&&!e.dormant}).length:0;
     if(G.world&&G.world.spawners)leftB+=G.world.spawners.filter(function(sp){return !sp.dead&&secRevealed(sp.secIdx)}).length;
@@ -4903,12 +5415,19 @@ function drawMap(cv,big){
       c.strokeStyle='#22d3ee'; c.lineWidth=1.8; c.strokeRect(ex2-4,ey2-5,8,10);
       if(big){ c.fillStyle='#a5f3fc'; c.font='800 9px system-ui'; c.textAlign='center'; c.fillText('EXTRACT',ex2,ey2+16); c.textAlign='left'; }
     }
+    if(W.portal&&explored3[W.portal.secIdx]){
+      var px3=ox3+(W.portal.x+W.portal.w/2)*sc3, py3=oy3+(W.portal.y+W.portal.h/2)*sc3;
+      c.fillStyle='#164e63'; c.beginPath(); c.arc(px3,py3,big?7:4.5,0,Math.PI*2); c.fill();
+      c.strokeStyle='#22d3ee'; c.lineWidth=1.8; c.beginPath(); c.arc(px3,py3,big?7:4.5,0,Math.PI*2); c.stroke();
+      if(big){ c.fillStyle='#a5f3fc'; c.font='800 9px system-ui'; c.textAlign='center'; c.fillText(W.bkFinal?'COMPLETE':'NEXT MAP',px3,py3+16); c.textAlign='left'; }
+    }
     for(var pi4=0;pi4<W.pickups.length;pi4++){ var pk4=W.pickups[pi4];
       if(pk4.type==='cell'&&!pk4.taken){
         if(pk4.secIdx!==undefined&&explored3[pk4.secIdx]){ c.font=(big?'17px':'12px')+' system-ui'; c.textAlign='center';
           c.fillText('🔋', ox3+(pk4.x+13)*sc3, oy3+(pk4.y+15)*sc3); c.textAlign='left'; }
         break; } }
     G.corpses.forEach(function(cp){ if(cp.site!==-2)return;
+      if(((cp.bkMap===undefined||cp.bkMap===null)?0:cp.bkMap)!==(G.bkMapIdx||0))return; // only this map's wrecks belong on this map
       var wi=-1;
       for(var wsi=0;wsi<W.sections.length;wsi++){ var ws2=W.sections[wsi];
         if(cp.x+20>=ws2.x&&cp.x+20<ws2.x+ws2.w&&cp.y+12>=ws2.y&&cp.y+12<ws2.y+ws2.h)wi=wsi; }
