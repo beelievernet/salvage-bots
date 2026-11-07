@@ -1,7 +1,7 @@
-// Salvage Bots service worker — cache salvage-bots-v2
+// Salvage Bots service worker — cache salvage-bots-v3
 // Bump the cache name on every rebuild that changes the app, or an
 // installed copy will keep serving the older build.
-var CACHE = 'salvage-bots-v2';
+var CACHE = 'salvage-bots-v3';
 var FILES = ['./', 'index.html', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 self.addEventListener('install', function (e) {

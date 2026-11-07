@@ -185,6 +185,7 @@ textarea.export{width:100%;min-height:120px;background:#0a0f14;color:#a5f3fc;bor
           <div><b>♻️ Death leaves a wreck</b><br>A dead bot stays where it fell — on the ground under where it died, or by the pit it fell into — holding a portion of its installed parts and its haul. Roll out in a new bot and recover it. Wrecks accumulate, and <b>every new death decays all older wrecks</b>, so the pile caps itself.</div>
           <div><b>🏭 Sites remember you</b><br>A site keeps the <b style="color:#fff">same layout</b> while its component or a wreck is still out there — you learn the route back to your wreck. Once a site is stripped clean, it closes and a fresh random site takes its place.</div>
           <div><b>🎯 Auto-fire, real map</b><br>Your blaster aims and fires by itself, in town and in sites — at where the enemy <b>was</b> when the shot fired, so fast enemies genuinely dodge it. It prefers enemies it has a <b>clear shot</b> at — if the nearest enemy is behind a wall but another is in the open, it shoots the open one (aiming at whatever part of it is exposed). Only when <i>nothing</i> in range has a clear shot does it fall back to the nearest enemy anyway and fire at it through the wall — a wall may not always stay between you and a shot. Default move-and-fire is <b>Accuracy</b>: firing while moving scatters shots inside the amber cone drawn from your gun — slow down or stand still to shoot straight (mode &amp; cone angle live in the 🧪 menu). Double jump is standard kit. The map (top-right, or <span class="kbd">M</span>) shows the site as a place — and marks your wrecks ♻ once their section is explored. <b>Sections start fogged</b>: you can make out floors and platforms through the dark, but not what's waiting — a section's defenders only power up, with a brief orange materialise, when you first step in, so nothing can be sniped from a room you haven't entered.</div>
+          <div><b>🛡 The Bunker — a top-down site</b><br>South-east of town stands a fourth building: <b>the Bunker</b> (stand below it and press <span class="kbd">E</span>). It is <b>one</b> top-down site, not a chain: about six fogged rooms on a grid. Down there is <b>no gravity and no jumping</b> — the joystick or <span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> moves in 8 directions, walls are solid, and the same autofire, mods, XP, physical drops and wreck rules apply (the Accuracy cone keys off your total speed). Inside: a <b>battle room</b> ⚔️ that seals until its fabricator waves are cleared, a <b>branch fabricator</b> 🏭 guarding a +2 ⚙️ cache, and a <b>guardian</b> 👹 whose death releases the <b>Power Cell (+3 ⚙️)</b>. Only those two kills pay a mod choice. There is no far exit — haul the cell back to the <b>extraction exit in the entry room</b>, live from the moment you arrive. The bunker keeps its layout while a wreck or the cell is outstanding, and counts as cleared once the cell is banked.</div>
           <div><b>⛏ Zones are chains of maps</b><br>A zone is <b>3 maps</b>. Each map has a <b>battle room</b> ⚔️ (doors seal until you clear the fabricator waves), a branch with a fabricator, and a crowned <b>miniboss</b> 👹 — its door is inert while it lives and opens on its death: onward to the next map, or, on the last map, zone complete. Each map also has an <b>extraction exit by its entry</b>: bank the haul and end the run, or push deeper. <b>Miniboss kills and branch fabricator kills pay a 1-of-3 mod choice</b> (+projectile, chain, piercing, homing, bounce — stacking, in-run only, carrying across map doors; reroll from the haul). Kills also pay <b>XP</b> toward automatic small boosts (spawner-born bots pay none). <b>All kill loot is physical</b>: it lands on the ground where things died and joins the haul only when you pick it up. Check what you're carrying any time with the 🎒 button or <span class="kbd">I</span>. Your jumps are a single budget of 2 per airborne stint: jumping off the ground spends one (leaving the classic double jump), but walking off a ledge, dropping through one, or getting knocked off spends none — both jumps are still yours in the air — and landing refills the budget. In Accuracy mode, jumping and falling widen your spread cone, and a multi-projectile volley fans wider with it, over a standing base spread that never collapses. Your shots fly until they hit something — a wall, their last pierced enemy, or the edge of the map.</div>
         </div>
         <p class="small controls-long"><span class="kbd">A</span> <span class="kbd">D</span> / <span class="kbd">←</span> <span class="kbd">→</span> move &nbsp;•&nbsp; <span class="kbd">Space</span> / <span class="kbd">W</span> jump, tap again mid-air to double-jump &nbsp;•&nbsp; Hold <span class="kbd">S</span> / <span class="kbd">↓</span> on a thin teal ledge to drop through it &nbsp;•&nbsp; <span class="kbd">E</span> extract at an exit door / open the workshop in town &nbsp;•&nbsp; On touch: drag on the left half — the joystick appears under your thumb — pull it <b>down</b> to drop through a thin ledge, and tap JUMP on the right. In town there's no jumping — that same button (or <span class="kbd">Space</span>) is a <b>hop</b>: a short hop clean over rocks, trees and slimes.</p>
@@ -423,6 +424,7 @@ function newRun(){
      mapIdx:0,mapsPerZone:3,zoneStates:{},pendingChoice:null,rerollsThisChoice:0,choiceQueue:[],mbDead:{},
      runSeed:Math.floor(Math.random()*1000000000),
      bankScrap:30,bankComp:6,corpses:[],corpseSeq:0,spawnerStates:{},siteStates:{},botNum:1,botAlive:true,botCost:{s:0,c:0},botInstalls:[],
+     bunkerSite:{seed:Math.floor(Math.random()*900000000)+1000,level:1,compTaken:false,clears:0},bunkerSave:null,nearBunker:false,
      unlocked:{plating:true,heavy:true,boots:true},unlocksEarned:0,townDone:{},
      zones:zones,
      mods:baseMods(),
@@ -1468,14 +1470,20 @@ function genOverworld(){
     {x:170,y:940,w:76,h:84,kind:'bunker'}
   ];
   doors.forEach(function(d,i){ var z=G.zones[i]; d.icon=z.icon; d.name=z.name; d.door={x:d.x+13,y:d.y+38,w:50,h:46}; });
+  // THE BUNKER: a fourth, distinct town building — NOT a zone door. It is
+  // entered by button press only (see updateOW / syncPrompt), never by walking in.
+  var bunkerDoor={x:1252,y:952,w:104,h:92,kind:'bunkerSite'};
+  bunkerDoor.door={x:bunkerDoor.x+27,y:bunkerDoor.y+40,w:50,h:46};
   var spawn={x:OW_W/2-17,y:OW_H-280};
   var workshop={x:OW_W/2-95,y:OW_H-470,w:190,h:120};
   plats.push({x:workshop.x,y:workshop.y,w:workshop.w,h:workshop.h,kind:'workshop'});
+  plats.push({x:bunkerDoor.x,y:bunkerDoor.y,w:bunkerDoor.w,h:bunkerDoor.h,kind:'bunker'});
   var houses=[{x:330,y:420,w:110,h:86},{x:1150,y:430,w:110,h:86},{x:420,y:760,w:110,h:86},{x:1080,y:770,w:110,h:86}];
   houses.forEach(function(hs){ plats.push({x:hs.x,y:hs.y,w:hs.w,h:hs.h,kind:'house'}); });
   function blocked(x,y,w,h,pad){
     var r={x:x-pad,y:y-pad,w:w+pad*2,h:h+pad*2};
     for(var i=0;i<doors.length;i++)if(overlap(r,doors[i]))return true;
+    if(overlap(r,bunkerDoor))return true;
     if(overlap(r,{x:spawn.x-30,y:spawn.y-30,w:94,h:102}))return true;
     if(overlap(r,{x:workshop.x-30,y:workshop.y-30,w:workshop.w+60,h:workshop.h+110}))return true;
     for(var j=0;j<plats.length;j++)if(plats[j].kind!=='edge'&&overlap(r,plats[j]))return true;
@@ -1499,7 +1507,7 @@ function genOverworld(){
   var pickups=[];
   for(var c=0;c<10;c++)pickups.push({x:ri(60,OW_W-110),y:ri(60,OW_H-110),w:20,h:20,type:'coin',taken:false,bob:rf(0,6)});
   pickups.push({x:spawn.x-96,y:spawn.y+16,w:24,h:24,type:'heart',taken:false,bob:0});
-  return {w:OW_W,h:OW_H,plats:plats,enemies:enemies,pickups:pickups,doors:doors,spawn:spawn,workshop:workshop,houses:houses};
+  return {w:OW_W,h:OW_H,plats:plats,enemies:enemies,pickups:pickups,doors:doors,spawn:spawn,workshop:workshop,houses:houses,bunkerDoor:bunkerDoor};
 }
 function enterOverworld(fromZoneIdx,hp){
   G.mode='overworld';
@@ -1507,6 +1515,7 @@ function enterOverworld(fromZoneIdx,hp){
   G.ow.doors.forEach(function(d,i){ d.icon=G.zones[i].icon; d.name=G.zones[i].name; });
   var px=G.ow.spawn.x, py=G.ow.spawn.y;
   if(fromZoneIdx>=0){ var d=G.ow.doors[fromZoneIdx]; px=d.x+d.w/2-17; py=d.y+d.h+18; }
+  else if(fromZoneIdx===-2&&G.ow.bunkerDoor){ var bd2=G.ow.bunkerDoor; px=bd2.x+bd2.w/2-17; py=bd2.y+bd2.h+18; }
   G.player=makeOWPlayer(px,py,hp);
   G.bullets=[]; G.eBullets=[]; G.parts=[]; G.texts=[]; G.bolts=[]; G.pendingBounces=[];
   G.owCd=1.4; G.camX=undefined; G.camY=Math.max(0,py-320);
@@ -1600,6 +1609,7 @@ function corpseTotal(c){ var v=corpseValues(c); return v.s+v.c; }
 function wreckSpot(cause){
   var p=G.player;
   if(G.mode==='overworld')return {x:p.x,y:p.y+p.h-24};
+  if(G.mode==='bunker')return {x:p.x,y:p.y+p.h-24}; // top-down: the wreck rests in the room where the bot fell
   var W=G.world, cx=p.x+p.w/2, best=null;
   if(cause!=='pit'){
     W.plats.forEach(function(pl){ if(pl.wall)return;
@@ -1613,12 +1623,14 @@ function wreckSpot(cause){
 function botDeath(cause){
   if(!G.botAlive)return;
   if(G.mode==='zone')saveSiteState(); // the site remembers its fog and its roster for the recovery run
+  if(G.mode==='bunker')saveBunkerState(); // …and so does the bunker, independently of every zone
   var p=G.player, spot=wreckSpot(cause);
-  var where = G.mode==='overworld' ? 'in town' : ('in '+G.zones[G.zoneIdx].name);
+  var where = G.mode==='overworld' ? 'in town' : (G.mode==='bunker' ? 'in the Bunker' : ('in '+G.zones[G.zoneIdx].name));
   // every older wreck decays by one step per new death; crumbled ones go
   G.corpses.forEach(function(c){ c.age++; });
   G.corpses=G.corpses.filter(function(c){ return corpseTotal(c)>0; });
-  var corpse={id:++G.corpseSeq, site:(G.mode==='overworld'?-1:G.zoneIdx), mapIdx:(G.mode==='overworld'?-1:(G.mapIdx||0)), x:spot.x, y:spot.y, w:40, h:24,
+  if(G.bunkerSite&&G.bunkerSite.compTaken)maybeRerollBunker(); // a decayed-away bunker wreck frees the cleared site to re-roll
+  var corpse={id:++G.corpseSeq, site:(G.mode==='overworld'?-1:(G.mode==='bunker'?-2:G.zoneIdx)), mapIdx:(G.mode==='overworld'?-1:(G.mapIdx||0)), x:spot.x, y:spot.y, w:40, h:24,
     fullInstS:G.botCost.s, fullInstC:G.botCost.c, fullCarS:G.coins, fullCarC:G.carriedComp, age:0, botNum:G.botNum};
   // in-run mods and XP boosts are LOST on death (the wreck holds only
   // installed parts + collected haul — never uncollected ground drops)
@@ -1646,7 +1658,7 @@ function collectCorpse(c){
   } else {
     G.coins+=v.s; G.carriedComp+=v.c;
     toast('♻️ Wreck of Bot #'+c.botNum+' recovered: +🔩'+v.s+' scrap +⚙️'+v.c+' comp — in the haul. Extract to bank it!');
-    maybeRerollSite(G.zones[G.zoneIdx]);
+    if(G.mode==='bunker')maybeRerollBunker(); else maybeRerollSite(G.zones[G.zoneIdx]);
   }
   updateHUD();
 }
@@ -1655,7 +1667,7 @@ function checkCorpseTouch(siteIdx){
   for(var i=0;i<G.corpses.length;i++){ var c=G.corpses[i];
     if(c.site!==siteIdx)continue;
     if(siteIdx>=0&&c.mapIdx!==undefined&&c.mapIdx!==(G.mapIdx||0))continue;
-    if(siteIdx>=0){ var cSec=sectionIndexOfPoint(c.x+20,c.y+12); if(cSec>=0&&!secRevealed(cSec))continue; } // a wreck in a fogged section is found when its section is
+    if(siteIdx>=0||siteIdx===-2){ var cSec=sectionIndexOfPoint(c.x+20,c.y+12); if(cSec>=0&&!secRevealed(cSec))continue; } // a wreck in a fogged section (or bunker room) is found when its section is
     if(overlap(p,{x:c.x-8,y:c.y-16,w:c.w+16,h:c.h+22})){ collectCorpse(c); return; } }
 }
 // A site re-rolls ONLY once stripped: its component banked AND no wreck of
@@ -1676,7 +1688,23 @@ function maybeRerollSite(z){
 // deliberate (E / EXTRACT button) so wandering into the exit room while
 // exploring never ends the run by accident.
 function extract(){
-  if(G.mode!=='zone'||!G.botAlive)return;
+  if(!G.botAlive)return;
+  if(G.mode==='bunker'){
+    saveBunkerState(); // the bunker remembers its fog and its roster while it persists
+    var bk=G.bunkerSite, gotBk=G.player.hasCell;
+    var sb=G.coins, cb=G.carriedComp;
+    G.bankScrap+=sb; G.bankComp+=cb; G.coins=0; G.carriedComp=0;
+    if(gotBk){ bk.compTaken=true; bk.clears=(bk.clears||0)+1; earnUnlock(); }
+    var hpBk=G.player.hp;
+    SFX.win();
+    resetRunState(); // in-run mods and XP boosts end with the run
+    enterOverworld(-2,hpBk);
+    toast('🏘️ Back in town. Banked +🔩'+sb+' scrap +⚙️'+cb+' comp.'+(gotBk?' Power Cell secured — the Bunker counts as cleared; its layout re-rolls once no wreck remains in it.':''));
+    if(gotBk)maybeRerollBunker();
+    updateHUD();
+    return;
+  }
+  if(G.mode!=='zone')return;
   saveSiteState(); // fog lifted and kills/wounds in this site persist while the site does
   var z=G.zones[G.zoneIdx], gotComp=G.player.hasCell;
   var s=G.coins, c=G.carriedComp;
@@ -1798,6 +1826,10 @@ function updateOW(dt){
   // workshop proximity (menu only on a deliberate press — never walk-in)
   var ws=O.workshop;
   G.nearWorkshop = ws ? (Math.abs((p.x+p.w/2)-(ws.x+ws.w/2))<150 && p.y>ws.y+ws.h-30 && p.y<ws.y+ws.h+96) : false;
+  // the bunker door: proximity only ARMS the prompt — entering takes a
+  // deliberate press (E / the button), exactly like the workshop menu
+  var bkd=O.bunkerDoor;
+  G.nearBunker = bkd ? (Math.abs((p.x+p.w/2)-(bkd.x+bkd.w/2))<80 && p.y>bkd.y+bkd.h-44 && p.y<bkd.y+bkd.h+96) : false;
   checkCorpseTouch(-1);
   // zone doors
   if(G.owCd<=0){ for(var di=0;di<O.doors.length;di++){ if(overlap(p,O.doors[di].door)){ startZone(di); return; } } }
@@ -1883,8 +1915,10 @@ function renderOW(){
   ctx.strokeStyle='#57503f'; ctx.lineWidth=44; ctx.lineCap='round';
   O.doors.forEach(function(d){ ctx.beginPath(); ctx.moveTo(O.spawn.x+17,O.spawn.y+21); ctx.lineTo(d.x+d.w/2,d.y+d.h+8); ctx.stroke(); });
   ctx.beginPath(); ctx.moveTo(O.spawn.x+17,O.spawn.y+21); ctx.lineTo(O.workshop.x+O.workshop.w/2,O.workshop.y+O.workshop.h+6); ctx.stroke();
+  if(O.bunkerDoor){ ctx.beginPath(); ctx.moveTo(O.spawn.x+17,O.spawn.y+21); ctx.lineTo(O.bunkerDoor.x+O.bunkerDoor.w/2,O.bunkerDoor.y+O.bunkerDoor.h+8); ctx.stroke(); }
   ctx.strokeStyle='#6b6250'; ctx.lineWidth=30;
   O.doors.forEach(function(d){ ctx.beginPath(); ctx.moveTo(O.spawn.x+17,O.spawn.y+21); ctx.lineTo(d.x+d.w/2,d.y+d.h+8); ctx.stroke(); });
+  if(O.bunkerDoor){ ctx.beginPath(); ctx.moveTo(O.spawn.x+17,O.spawn.y+21); ctx.lineTo(O.bunkerDoor.x+O.bunkerDoor.w/2,O.bunkerDoor.y+O.bunkerDoor.h+8); ctx.stroke(); }
   // obstacles & buildings
   O.plats.forEach(function(pl){
     if(pl.kind==='edge')return;
@@ -1913,6 +1947,33 @@ function renderOW(){
       ctx.fillStyle=fixed?'#92400e':'#38302a'; ctx.beginPath(); ctx.moveTo(pl.x-8,pl.y+18); ctx.lineTo(pl.x+pl.w/2,pl.y-16); ctx.lineTo(pl.x+pl.w+8,pl.y+18); ctx.closePath(); ctx.fill();
       ctx.fillStyle=(fixed||G.townDone.power)?'#fde68a':'#1c1917'; ctx.fillRect(pl.x+16,pl.y+36,20,18); ctx.fillRect(pl.x+pl.w-36,pl.y+36,20,18);
       if(!fixed){ ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(pl.x+8,pl.y+pl.h); ctx.lineTo(pl.x+30,pl.y+40); ctx.lineTo(pl.x+52,pl.y+62); ctx.stroke(); }
+      return;
+    }
+    if(pl.kind==='bunker'){
+      // THE BUNKER building: a squat concrete vault mound, distinct from
+      // every zone door — steel door in the shared doorway treatment
+      // (pale frame, light spill, marker diamond), cyan while the site
+      // is live, green once stripped. Entry is by button press only.
+      var bd=pl, bcx=bd.x+bd.w/2, bdoor=O.bunkerDoor?O.bunkerDoor.door:{x:bd.x+27,y:bd.y+40,w:50,h:46};
+      var bkCleared=!!(G.bunkerSite&&G.bunkerSite.compTaken&&!G.corpses.some(function(c){return c.site===-2}));
+      var bkWrecks=G.corpses.filter(function(c){return c.site===-2}).length;
+      ctx.fillStyle='#3f4a42'; ctx.beginPath(); ctx.ellipse(bcx,bd.y+bd.h-2,bd.w/2+26,58,0,Math.PI,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#4d5a50'; ctx.beginPath(); ctx.ellipse(bcx,bd.y+bd.h-2,bd.w/2+10,44,0,Math.PI,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#10151c'; ctx.fillRect(bdoor.x,bdoor.y,bdoor.w,bdoor.h);
+      var bkCode= bkCleared? '#4ade80' : '#22d3ee';
+      ctx.fillStyle= bkCleared? 'rgba(74,222,128,0.15)' : 'rgba(165,205,240,0.20)';
+      ctx.beginPath(); ctx.ellipse(bcx,bdoor.y+bdoor.h+13,58,13,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='rgba(219,238,255,0.12)'; ctx.fillRect(bdoor.x,bdoor.y,bdoor.w,bdoor.h);
+      ctx.strokeStyle=bkCode; ctx.lineWidth=4; rr(bdoor.x-3,bdoor.y-3,bdoor.w+6,bdoor.h+6,6); ctx.stroke();
+      ctx.strokeStyle='rgba(232,244,255,0.75)'; ctx.lineWidth=1.6; rr(bdoor.x-3,bdoor.y-3,bdoor.w+6,5,3); ctx.stroke();
+      ctx.save(); ctx.translate(bcx,bdoor.y-13); ctx.rotate(Math.PI/4); ctx.fillStyle='#e8f4ff'; ctx.fillRect(-4.5,-4.5,9,9); ctx.fillStyle='#31597c'; ctx.fillRect(-2,-2,4,4); ctx.restore();
+      if(!bkCleared){ ctx.strokeStyle='rgba(34,211,238,'+(0.35+Math.sin(G.time*4)*0.22)+')'; ctx.lineWidth=8; rr(bdoor.x-7,bdoor.y-7,bdoor.w+14,bdoor.h+14,8); ctx.stroke(); }
+      ctx.font='800 13px system-ui'; ctx.textAlign='center';
+      ctx.fillStyle='#fff'; ctx.fillText('🛡 THE BUNKER',bcx,bd.y+bd.h+22);
+      ctx.font='800 11px system-ui'; ctx.fillStyle=bkCleared?'#4ade80':'#a5f3fc';
+      ctx.fillText((bkCleared?'✓ STRIPPED':'TOP-DOWN SITE • Lv '+(G.bunkerSite?G.bunkerSite.level:1))+(bkWrecks?' • ♻ '+bkWrecks+' wreck'+(bkWrecks>1?'s':''):''),bcx,bd.y+bd.h+38);
+      ctx.fillText('stand below & press E',bcx,bd.y+bd.h+54);
+      ctx.textAlign='left';
       return;
     }
     if(pl.kind==='rock'){
@@ -2266,7 +2327,7 @@ function nearestEnemy(){
 // drawPlayerTop) so the hit is something you can see, not just feel.
 function moveFrac(p){
   var ms=(G.mods&&G.mods.moveSpeed)||265;
-  if(G.mode==='overworld')return Math.min(1,Math.hypot(p.vx||0,p.vy||0)/ms);
+  if(G.mode==='overworld'||G.mode==='bunker')return Math.min(1,Math.hypot(p.vx||0,p.vy||0)/ms); // top-down: the cone keys off TOTAL speed magnitude
   // STEP 2 air accuracy: in a site the speed input is TOTAL speed —
   // horizontal plus vertical scaled by the air-factor dial. Rising and
   // falling widen the cone; a fast fall can reach the slider maximum;
@@ -2393,6 +2454,12 @@ function settleDropY(x,y,w){
 }
 function spawnDropToken(x,y,type,amt){
   if(!G.world||!G.world.pickups)return;
+  if(G.mode==='bunker'){ // top-down: there is no floor to settle on — the token rests where the kill fell
+    var bx2=Math.max(30,Math.min(G.world.w-52, x+(Math.random()*36-18))), by2=Math.max(30,Math.min(G.world.h-52, y+(Math.random()*36-18)));
+    var bSec=sectionIndexOfPoint(bx2+11,by2+11);
+    G.world.pickups.push({x:bx2,y:by2,w:22,h:22,type:type,amt:amt||1,taken:false,bob:Math.random()*6,secIdx:bSec>=0?bSec:undefined,drop:true});
+    return;
+  }
   var s=settleDropY(x+(Math.random()*36-18),y,22);
   var px=(typeof s==='object')?s.x:x, py=(typeof s==='object')?s.y:y;
   var secI=sectionIndexOfPoint(px+11,py+11);
@@ -2434,7 +2501,7 @@ function damageEnemy(e,dmg,ang){
   var stunBase=(TUN.stunSec===undefined?0.28:TUN.stunSec);
   e.stun=Math.max(e.stun, e.type==='miniboss'?stunBase*0.25 : e.type==='brute'?stunBase*0.43 : stunBase);
   var kb=(e.type==='miniboss'?55 : e.type==='brute'?90 : 230)*((TUN.knockbackPct===undefined?100:TUN.knockbackPct)/100);
-  e.vx+=Math.cos(ang)*kb; if(e.type==='flyer')e.vy+=Math.sin(ang)*kb*0.6;
+  e.vx+=Math.cos(ang)*kb; if(e.type==='flyer')e.vy+=Math.sin(ang)*kb*0.6; else if(G.mode==='bunker')e.vy+=Math.sin(ang)*kb*0.8; // top-down: knockback is a 2D shove
   addText(e.x+e.w/2,e.y-6,Math.round(dmg)+(crit?'!':''),crit?'#fbbf24':'#fff');
   SFX.hit();
   if(e.hp<=0&&!e.dead){ e.dead=true; G.kills++; G.score+=e.type==='miniboss'?300:(e.type==='brute'?50:15); burst(e.x+e.w/2,e.y+e.h/2,e.type==='brute'?'#f97316':'#facc15',16,190); SFX.die();
@@ -2449,6 +2516,9 @@ function damageEnemy(e,dmg,ang){
       burst(e.x+e.w/2,e.y+e.h/2,'#f59e0b',30,260); addText(e.x+e.w/2,e.y-24,'MINIBOSS DOWN — loot on the ground!','#fbbf24');
       toast('👹 Miniboss destroyed: 🔩'+mbPay+' + ⚙️1 scattered as ground tokens — pick them up! Its door is now open.');
       queueChoice('👹 Miniboss down');
+      // THE BUNKER: the guardian's death RELEASES the Power Cell — its
+      // containment field drops wherever it stands (guardian room or vault)
+      if(G.mode==='bunker'&&G.world)G.world.pickups.forEach(function(pk){ if(pk.type==='cell'&&pk.locked){ pk.locked=false; burst(pk.x+13,pk.y+13,'#22d3ee',20,220); addText(pk.x+13,pk.y-16,'🔋 POWER CELL RELEASED','#a5f3fc'); } });
     }
     // drops — heart chance is the heal-drop dial in the debug menu.
     // SPAWNER-BORN bots drop NOTHING, ever: the fabricator holds the loot.
@@ -2481,9 +2551,10 @@ function spawnerDropNow(sp){
   return Math.max(1, floorDrop+Math.round((full-floorDrop)*frac));
 }
 function spawnerSave(sp){
-  if(G.zoneIdx===undefined||G.zoneIdx<0)return;
+  if(G.mode!=='bunker'&&(G.zoneIdx===undefined||G.zoneIdx<0))return;
   if(!G.spawnerStates)G.spawnerStates={};
-  var zs=G.spawnerStates[mapKey()]||(G.spawnerStates[mapKey()]={});
+  var skey= G.mode==='bunker'? 'BK' : mapKey(); // the bunker keeps its own fabricator ledger, independent of every zone
+  var zs=G.spawnerStates[skey]||(G.spawnerStates[skey]={});
   zs[sp.id]={hp:Math.max(0,sp.hp),dead:!!sp.dead,budgetLeft:sp.budgetLeft};
 }
 function damageSpawner(sp,dmg){
@@ -2563,7 +2634,7 @@ var lastTs=0;
 function loop(ts){
   requestAnimationFrame(loop);
   var dt=Math.min(0.033,(ts-lastTs)/1000||0.016); lastTs=ts;
-  if(G.state==='play'){ if(G.mode==='overworld'&&G.ow)updateOW(dt); else update(dt); }
+  if(G.state==='play'){ if(G.mode==='overworld'&&G.ow)updateOW(dt); else if(G.mode==='bunker'&&G.world)updateBunker(dt); else update(dt); }
   syncPrompt();
   render();
 }
@@ -3024,6 +3095,7 @@ function render(){
   ctx.clearRect(0,0,VW,VH);
   ctx.fillStyle='#0d1622'; ctx.fillRect(0,0,VW,VH);
   if(G.mode==='overworld'&&G.ow){ renderOW(); return; }
+  if(G.mode==='bunker'&&G.world){ renderBunker(); return; }
   if(!G.world){ return; }
   var W=G.world,p=G.player;
   var vm=viewMetrics(), scale=vm.scale, viewH=vm.h;
@@ -3464,6 +3536,7 @@ function drawEnemy(e){
   if(e.type==='turret'){ ctx.fillStyle='#1f2937'; ctx.fillRect(-e.w/2-3,e.h/2-6,e.w+6,6); ctx.fillStyle=flash?'#fff':'#64748b'; rr(-e.w/2,-e.h/2,e.w,e.h,6); ctx.fill(); ctx.strokeStyle='#0f172a'; ctx.lineWidth=2; rr(-e.w/2,-e.h/2,e.w,e.h,6); ctx.stroke(); ctx.fillStyle='#0f172a'; ctx.beginPath(); ctx.arc(-e.w/2+7,-e.h/2+7,2.2,0,Math.PI*2); ctx.arc(e.w/2-7,-e.h/2+7,2.2,0,Math.PI*2); ctx.arc(-e.w/2+7,e.h/2-13,2.2,0,Math.PI*2); ctx.arc(e.w/2-7,e.h/2-13,2.2,0,Math.PI*2); ctx.fill(); var pa=Math.atan2((G.player.y+G.player.h/2)-(e.y+e.h/2),(G.player.x+G.player.w/2)-(e.x+e.w/2)); ctx.save(); ctx.rotate(pa); ctx.fillStyle='#111827'; ctx.fillRect(6,-3.5,20,7); ctx.fillStyle='#fca5a5'; ctx.fillRect(23,-2.5,4,5); ctx.restore(); ctx.fillStyle=flash?'#fff':'#f97316'; ctx.beginPath(); ctx.arc(0,0,11,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#fff7ed'; ctx.beginPath(); ctx.arc(0,0,4.5,0,Math.PI*2); ctx.fill(); }
   if(e.type==='brute'){ ctx.fillStyle=flash?'#fff':'#7c2d12'; ctx.fillRect(-e.w/2-6,-e.h/2+2,13,16); ctx.fillRect(e.w/2-7,-e.h/2+2,13,16); ctx.fillStyle=flash?'#fff':'#fde68a'; ctx.beginPath(); ctx.moveTo(-e.w/2-7,-e.h/2+4); ctx.lineTo(-e.w/2-14,-e.h/2-5); ctx.lineTo(-e.w/2-1,-e.h/2-2); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(e.w/2+7,-e.h/2+4); ctx.lineTo(e.w/2+14,-e.h/2-5); ctx.lineTo(e.w/2+1,-e.h/2-2); ctx.closePath(); ctx.fill(); ctx.fillStyle=flash?'#fff':'#9a3412'; rr(-e.w/2,-e.h/2,e.w,e.h,12); ctx.fill(); ctx.fillStyle='#431407'; ctx.fillRect(-e.w/2,-e.h/2,e.w,12); ctx.strokeStyle='rgba(253,230,138,0.65)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-e.w/2+8,4); ctx.lineTo(e.w/2-8,4); ctx.stroke(); }
   if(e.type==='miniboss'){ ctx.fillStyle=flash?'#fff':'#450a0a'; ctx.fillRect(-e.w/2-7,-e.h/2+4,15,18); ctx.fillRect(e.w/2-8,-e.h/2+4,15,18); ctx.fillStyle=flash?'#fff':'#7f1d1d'; rr(-e.w/2,-e.h/2,e.w,e.h,12); ctx.fill(); ctx.fillStyle=flash?'#fff':'#991b1b'; rr(-e.w/2,-e.h/2,e.w,16,10); ctx.fill(); ctx.fillStyle='#f59e0b'; for(var cr=-2;cr<=2;cr++){ ctx.beginPath(); ctx.moveTo(cr*11-5,-e.h/2-2); ctx.lineTo(cr*11,-e.h/2-19); ctx.lineTo(cr*11+5,-e.h/2-2); ctx.closePath(); ctx.fill(); } ctx.strokeStyle='#fde68a'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(-e.w/2+4,-e.h/2-2); ctx.lineTo(e.w/2-4,-e.h/2-2); ctx.stroke(); ctx.fillStyle=flash?'#fff':'#f97316'; ctx.beginPath(); ctx.arc(0,9,13,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#ffedd5'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(0,9,13,0,Math.PI*2); ctx.stroke(); ctx.fillStyle='#fff7ed'; ctx.beginPath(); ctx.arc(0,9,5,0,Math.PI*2); ctx.fill(); }
+  if(e.type==='slime'){ var sq2=1+Math.sin(e.t*6)*0.08; ctx.scale(1/sq2,sq2); ctx.fillStyle=flash?'#fff':'#65a30d'; ctx.beginPath(); ctx.ellipse(0,2,e.w/2,e.h/2-2,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='rgba(236,252,203,0.5)'; ctx.beginPath(); ctx.ellipse(0,9,e.w/3.2,4.5,0,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#365314'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-6,-8); ctx.lineTo(-7,-14); ctx.moveTo(6,-8); ctx.lineTo(7,-14); ctx.stroke(); ctx.fillStyle='#ecfccb'; ctx.beginPath(); ctx.arc(-7,-15,3.4,0,Math.PI*2); ctx.arc(7,-15,3.4,0,Math.PI*2); ctx.fill(); }
   // eyes look toward player
   var p=G.player, look=p.x>e.x?1:-1;
   ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(look*5-6,-4,4,0,Math.PI*2); ctx.arc(look*5+6,-4,4,0,Math.PI*2); ctx.fill();
@@ -3558,12 +3631,672 @@ function drawPlayer(p){
     ctx.strokeStyle='rgba(253,224,71,0.18)'; ctx.lineWidth=2; ctx.setLineDash([5,7]); ctx.beginPath(); ctx.moveTo(p.x+p.w/2,p.y+12); ctx.lineTo(t._aimX!==undefined?t._aimX:t.x+t.w/2,t._aimY!==undefined?t._aimY:t.y+t.h/2); ctx.stroke(); ctx.setLineDash([]); }
 }
 
+// ---------- THE BUNKER: one top-down run site (Step 3) ----------
+// ONE site, not a map chain: ~6 rooms on a real 2D grid, generated per
+// run with the same seeding discipline as zones, entered from town by a
+// deliberate button press. It shares the bot, hull, loadout, haul and
+// scrap with the factory zones and runs under the same rules —
+// extraction at the entry exit (live from the start), keyed kills
+// (branch fabricator + guardian ONLY), XP, physical ground drops,
+// death/wreck, fog — but with NO gravity, no platforms and no jumping:
+// 8-way movement, solid walls, wall sliding, and the Accuracy cone
+// keyed off total speed magnitude (see moveFrac). Its persistence
+// (G.bunkerSite + G.bunkerSave + spawnerStates['BK'], wrecks at site
+// code -2) is fully independent of every factory zone's state.
+var BK_RW=760, BK_RH=520;
+function genBunker(seed,level){
+  seedRng(seed*7919 + level*131 + 17); // the zones' seeding discipline
+  var scaling=(TUN.siteLevelScaling===undefined?0.28:TUN.siteLevelScaling);
+  var hpScale=(1+(level-1)*scaling)*(TUN.enemyHpMult||1);
+  var spHp=115*hpScale;
+  function key(c){ return c.gx+','+c.gy; }
+  function assignRoles(cells,treeEdges,startC){
+    var parent={}, dist={}, q=[startC]; dist[key(startC)]=0;
+    while(q.length){ var cur=q.shift();
+      treeEdges.forEach(function(te){ var o= te.a===cur? te.b : (te.b===cur? te.a : null);
+        if(o&&dist[key(o)]===undefined){ dist[key(o)]=dist[key(cur)]+1; parent[key(o)]=cur; q.push(o); } }); }
+    var guardian=null, gd=-1;
+    cells.forEach(function(c){ if(dist[key(c)]>gd){ gd=dist[key(c)]; guardian=c; } });
+    if(!guardian||gd<2)return null;
+    var path=[], pc=guardian, onPath={};
+    while(pc){ path.push(pc); onPath[key(pc)]=true; pc=parent[key(pc)]; }
+    var mid=path.filter(function(c){ return c!==guardian&&c!==startC; });
+    if(!mid.length)return null;
+    var battleC=mid[Math.floor(mid.length/2)]; // a room ON the way to the guardian
+    var deg={}; treeEdges.forEach(function(te){ deg[key(te.a)]=(deg[key(te.a)]||0)+1; deg[key(te.b)]=(deg[key(te.b)]||0)+1; });
+    var branchC=null; // a dead end first, any off-path room second
+    cells.forEach(function(c){ if(!branchC&&c!==startC&&c!==guardian&&c!==battleC&&(deg[key(c)]||0)<=1)branchC=c; });
+    if(!branchC)cells.forEach(function(c){ if(!branchC&&c!==startC&&c!==guardian&&c!==battleC&&!onPath[key(c)])branchC=c; });
+    if(!branchC)return null;
+    var inGrid={}; cells.forEach(function(c){ inGrid[key(c)]=c; });
+    var vaultC=null; // a free grid cell directly behind the guardian, if one exists
+    [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(dv){ if(vaultC)return;
+      var vx=guardian.gx+dv[0], vy=guardian.gy+dv[1];
+      if(vx<0||vx>2||vy<0||vy>2||inGrid[vx+','+vy])return;
+      vaultC={gx:vx,gy:vy}; });
+    return {guardian:guardian,battleC:battleC,branchC:branchC,vaultC:vaultC};
+  }
+  var layout=null, tries=0;
+  while(!layout&&tries++<80){
+    var cells=[{gx:ri(0,2),gy:2}], inG={}; inG[key(cells[0])]=cells[0];
+    var te2=[], guard3=0;
+    while(cells.length<6&&guard3++<400){
+      var from=cells[ri(0,cells.length-1)], dv=pick([[1,0],[-1,0],[0,1],[0,-1]]);
+      var nx=from.gx+dv[0], ny=from.gy+dv[1];
+      if(nx<0||nx>2||ny<0||ny>2||inG[nx+','+ny])continue;
+      var nc={gx:nx,gy:ny}; cells.push(nc); inG[key(nc)]=nc; te2.push({a:from,b:nc});
+    }
+    if(cells.length<6)continue;
+    var roles=assignRoles(cells,te2,cells[0]);
+    if(roles)layout={cells:cells,treeEdges:te2,startC:cells[0],roles:roles};
+  }
+  if(!layout){ // deterministic fallback: a hub with a bent corridor
+    var fc=[{gx:1,gy:2},{gx:1,gy:1},{gx:0,gy:1},{gx:2,gy:1},{gx:1,gy:0},{gx:0,gy:0}];
+    var fe=[{a:fc[0],b:fc[1]},{a:fc[1],b:fc[2]},{a:fc[1],b:fc[3]},{a:fc[1],b:fc[4]},{a:fc[4],b:fc[5]}];
+    layout={cells:fc,treeEdges:fe,startC:fc[0],roles:assignRoles(fc,fe,fc[0])};
+  }
+  var R=layout.roles, allCells=layout.cells.slice();
+  if(R.vaultC)allCells.push(R.vaultC);
+  var minGx=99,minGy=99,maxGx=-1,maxGy=-1;
+  allCells.forEach(function(c){ minGx=Math.min(minGx,c.gx); minGy=Math.min(minGy,c.gy); maxGx=Math.max(maxGx,c.gx); maxGy=Math.max(maxGy,c.gy); });
+  var roamNames=['Storage Bay','Dormitory','Workshop Annex','Air Plant','Comms Nook','Flooded Stores'];
+  var rooms=[], roomOf={};
+  function mkRoom(c,role,name){
+    var r={gx:c.gx,gy:c.gy,x:(c.gx-minGx)*BK_RW,y:(c.gy-minGy)*BK_RH,w:BK_RW,h:BK_RH,
+      topY:(c.gy-minGy)*BK_RH, floorY:(c.gy-minGy)*BK_RH+BK_RH, type:'bunker', name:name, order:rooms.length,
+      branch:role==='branch', battle:role==='battle', minibossRoom:role==='guardian', entry:role==='entry', vault:role==='vault', floorSegs:[]};
+    rooms.push(r); roomOf[key(c)]=r; return r;
+  }
+  var entryRoom=mkRoom(layout.startC,'entry','Entry Airlock');
+  layout.cells.forEach(function(c){ if(c===layout.startC)return;
+    var role= c===R.guardian?'guardian': c===R.battleC?'battle': c===R.branchC?'branch':'roam';
+    var nm= role==='guardian'?'Guardian Chamber': role==='battle'?'Battle Room': role==='branch'?'Branch Cache': pick(roamNames);
+    mkRoom(c,role,nm); });
+  var vaultRoom= R.vaultC? mkRoom(R.vaultC,'vault','Power Vault') : null;
+  var edges=[];
+  function mkEdge(ra,rb,kind){ var dir= rb.gx>ra.gx?'right': rb.gx<ra.gx?'left': rb.gy>ra.gy?'down':'up';
+    var e={a:ra,b:rb,kind:kind,dir:dir,elevated:false,gapX:0,doorY:0,door:null,vert:(dir==='left'||dir==='right')}; edges.push(e); return e; }
+  layout.treeEdges.forEach(function(te){ mkEdge(roomOf[key(te.a)],roomOf[key(te.b)],'crit'); });
+  if(vaultRoom)mkEdge(roomOf[key(R.guardian)],vaultRoom,'vault');
+  // one loop edge between touching rooms the tree did not connect
+  var loopDone=false;
+  rooms.forEach(function(ra){ if(loopDone||ra===vaultRoom)return;
+    rooms.forEach(function(rb){ if(loopDone||rb===ra||rb===vaultRoom)return;
+      if(Math.abs(ra.gx-rb.gx)+Math.abs(ra.gy-rb.gy)!==1)return;
+      var has=false; edges.forEach(function(e){ if((e.a===ra&&e.b===rb)||(e.a===rb&&e.b===ra))has=true; });
+      if(!has&&rand()<0.6){ mkEdge(ra,rb,'loop'); loopDone=true; } }); });
+  // ---- walls: a border band on every grid line touching a room, with
+  // a doorway gap wherever an edge crosses it ----
+  var plats=[];
+  function edgeBetween(ra,rb){ for(var i=0;i<edges.length;i++){ var e=edges[i]; if((e.a===ra&&e.b===rb)||(e.a===rb&&e.b===ra))return e; } return null; }
+  var gx2,gy2;
+  for(gx2=minGx;gx2<=maxGx+1;gx2++)for(gy2=minGy;gy2<=maxGy;gy2++){
+    var L=roomOf[(gx2-1)+','+gy2], Rt=roomOf[gx2+','+gy2];
+    if(!L&&!Rt)continue;
+    var X=(gx2-minGx)*BK_RW, Y=(gy2-minGy)*BK_RH;
+    var bandX= L&&Rt? X-11 : (L? X-22 : X);
+    var ev= (L&&Rt)? edgeBetween(L,Rt) : null;
+    if(ev){ var cy=Y+BK_RH/2+ri(-50,50); ev.door={x:bandX,y:cy-60,w:22,h:120};
+      plats.push({x:bandX,y:Y,w:22,h:(cy-60)-Y,wall:true});
+      plats.push({x:bandX,y:cy+60,w:22,h:(Y+BK_RH)-(cy+60),wall:true});
+    } else plats.push({x:bandX,y:Y,w:22,h:BK_RH,wall:true});
+  }
+  for(gy2=minGy;gy2<=maxGy+1;gy2++)for(gx2=minGx;gx2<=maxGx;gx2++){
+    var U=roomOf[gx2+','+(gy2-1)], D=roomOf[gx2+','+gy2];
+    if(!U&&!D)continue;
+    var X2=(gx2-minGx)*BK_RW, Y2=(gy2-minGy)*BK_RH;
+    var bandY= U&&D? Y2-11 : (U? Y2-22 : Y2);
+    var eh= (U&&D)? edgeBetween(U,D) : null;
+    if(eh){ var cx=X2+BK_RW/2+ri(-60,60); eh.door={x:cx-75,y:bandY,w:150,h:22};
+      plats.push({x:X2,y:bandY,w:(cx-75)-X2,h:22,wall:true});
+      plats.push({x:cx+75,y:bandY,w:(X2+BK_RW)-(cx+75),h:22,wall:true});
+    } else plats.push({x:X2,y:bandY,w:BK_RW,h:22,wall:true});
+  }
+  // ---- interior cover: a crate or two per room, clear of doorways ----
+  rooms.forEach(function(r){
+    if(r.vault)return;
+    var n=ri(1,2);
+    for(var ci=0;ci<n;ci++){ var placedC=false;
+      for(var ct=0;ct<30&&!placedC;ct++){
+        var cw=ri(44,72), chh=ri(44,72);
+        var cxx=rf(r.x+90,r.x+r.w-90-cw), cyy=rf(r.y+90,r.y+r.h-90-chh);
+        var ccx=cxx+cw/2, ccy=cyy+chh/2, ok=true;
+        edges.forEach(function(e3){ if(e3.door&&Math.hypot(ccx-(e3.door.x+e3.door.w/2),ccy-(e3.door.y+e3.door.h/2))<150)ok=false; });
+        if(ok)plats.forEach(function(pl){ if(pl.crate&&overlap({x:cxx-16,y:cyy-16,w:cw+32,h:chh+32},pl))ok=false; });
+        if(ok){ plats.push({x:cxx,y:cyy,w:cw,h:chh,wall:true,crate:true}); placedC=true; }
+      } }
+  });
+  // ---- rosters, fabricators, loot ----
+  var enemies=[], spawners=[], pickups=[], decors=[];
+  rooms.forEach(function(r,i){ decors.push({x:r.x+12,y:r.y+12,w:r.w-24,h:r.h-24,room:i,name:r.name,type:'bunker',shade:(r.gx+r.gy)%2,branch:r.branch,secRef:r}); });
+  function freeSpot(room,ww,hh,minDoorD){
+    for(var t=0;t<48;t++){
+      var x=rf(room.x+76,room.x+room.w-76-ww), y=rf(room.y+76,room.y+room.h-76-hh);
+      var cx=x+ww/2, cy=y+hh/2, ok=true;
+      edges.forEach(function(e){ if(e.door&&Math.hypot(cx-(e.door.x+e.door.w/2),cy-(e.door.y+e.door.h/2))<(minDoorD||130))ok=false; });
+      if(ok)for(var pi=0;pi<plats.length;pi++){ if(plats[pi].crate&&overlap({x:x-12,y:y-12,w:ww+24,h:hh+24},plats[pi])){ok=false;break;} }
+      if(ok)for(var ei=0;ei<enemies.length;ei++){ if(Math.hypot(cx-(enemies[ei].x+enemies[ei].w/2),cy-(enemies[ei].y+enemies[ei].h/2))<90)ok=false; }
+      if(ok)for(var si=0;si<spawners.length;si++){ if(Math.hypot(cx-(spawners[si].x+27),cy-(spawners[si].y+23))<120)ok=false; }
+      if(ok)return {x:x,y:y};
+    }
+    return {x:room.x+room.w/2-ww/2,y:room.y+room.h/2-hh/2};
+  }
+  function addEnemy(room,type){
+    var ew= type==='brute'?52 : type==='miniboss'?62 : 36;
+    var eh= type==='brute'?56 : type==='miniboss'?60 : 36;
+    var s=freeSpot(room,ew,eh,140);
+    var hpBase= type==='miniboss'?570 : {walker:26,flyer:20,turret:34,brute:95,slime:30}[type]; // the guardian: map-1 miniboss base stats, no escalation
+    var e={x:s.x,y:s.y,w:ew,h:eh,type:type,hp:hpBase*hpScale,maxhp:hpBase*hpScale,vx:0,vy:0,dir:rand()<0.5?-1:1,t:rf(0,6),fireT:rf(1,2.4),stun:0,flash:0,homeX:s.x,homeY:s.y,dead:false,spawned:false,dormant:true,spawnT:0,awaitDist:false,secIdx:rooms.indexOf(room)};
+    if(type==='miniboss')e.miniboss=true;
+    enemies.push(e); return e;
+  }
+  function addFab(room,budget,branch,battle){
+    var s=freeSpot(room,54,46,150);
+    var sp={id:'sp'+spawners.length,secIdx:rooms.indexOf(room),x:s.x,y:s.y,w:54,h:46,
+      hp:spHp,maxhp:spHp,budgetTotal:budget,budgetLeft:budget,timer:rf(1.2,2.4),warmup:0,warmX:0,warmY:0,warmType:'walker',
+      flash:0,dead:false,branch:!!branch,battle:!!battle};
+    spawners.push(sp); return sp;
+  }
+  rooms.forEach(function(r){
+    if(r.entry){ addEnemy(r,'walker');
+      for(var cn0=0;cn0<2;cn0++){ var cs0=freeSpot(r,20,20,110); pickups.push({x:cs0.x,y:cs0.y,w:20,h:20,type:'coin',taken:false,bob:rf(0,6),secIdx:rooms.indexOf(r)}); }
+    }
+    else if(r.battle){ /* the room starts empty — its fabricators make the waves */ }
+    else if(r.branch){ addEnemy(r,'walker'); }
+    else if(r.minibossRoom){ addEnemy(r,'miniboss'); if(rand()<0.6)addEnemy(r,'turret'); }
+    else if(r.vault){ /* the cell, and nothing else */ }
+    else {
+      var nE=Math.max(0,Math.round(ri(2,3)*(TUN.enemyCountMult||1)));
+      for(var ei2=0;ei2<nE;ei2++){
+        var wW=38*(TUN.spawnWalkerMult||0), wF=20*(TUN.spawnFlyerMult||0), wT=18*(TUN.spawnTurretMult||0), wB=10*(TUN.spawnBruteMult||0), wS=14*(TUN.spawnWalkerMult||0);
+        var tot=wW+wF+wT+wB+wS, roll=rand()*tot, type='walker';
+        if(tot<=0)type='walker';
+        else if(roll<wW)type='walker'; else if(roll<wW+wF)type='flyer'; else if(roll<wW+wF+wT)type='turret'; else if(roll<wW+wF+wT+wB)type='brute'; else type='slime';
+        addEnemy(r,type);
+      }
+      for(var cn=0;cn<3;cn++){ var cs=freeSpot(r,20,20,110); pickups.push({x:cs.x,y:cs.y,w:20,h:20,type:'coin',taken:false,bob:rf(0,6),secIdx:rooms.indexOf(r)}); }
+    }
+  });
+  // the branch fabricator and the +2 components cache it guards
+  var branchRoom=rooms.filter(function(r){return r.branch})[0];
+  var bFab=addFab(branchRoom, Math.max(0,Math.round(TUN.spawnerBudget===undefined?6:TUN.spawnerBudget)), true,false);
+  pickups.push({x:Math.min(branchRoom.x+branchRoom.w-70,bFab.x+bFab.w+14),y:bFab.y+8,w:22,h:22,type:'compDrop',amt:1,taken:false,bob:1,secIdx:rooms.indexOf(branchRoom),cache:true});
+  pickups.push({x:Math.max(branchRoom.x+40,bFab.x-38),y:bFab.y+8,w:22,h:22,type:'compDrop',amt:1,taken:false,bob:3,secIdx:rooms.indexOf(branchRoom),cache:true});
+  // battle room fabricators: two machines, 5 bots each = the waves
+  var battleRoom=rooms.filter(function(r){return r.battle})[0];
+  addFab(battleRoom,5,false,true); addFab(battleRoom,5,false,true);
+  // the Power Cell: in the vault when there is one, else the guardian
+  // room — SEALED (locked) until the guardian dies and releases it
+  var guardianRoom=rooms.filter(function(r){return r.minibossRoom})[0];
+  var cellRoom= vaultRoom||guardianRoom;
+  var compTakenNow=!!(G.bunkerSite&&G.bunkerSite.compTaken);
+  if(!compTakenNow){ var cellSpot=freeSpot(cellRoom,26,26,170);
+    pickups.push({x:cellSpot.x,y:cellSpot.y,w:26,h:26,type:'cell',taken:false,bob:rf(0,6),secIdx:rooms.indexOf(cellRoom),locked:true}); }
+  var roamRooms=rooms.filter(function(r){return !r.entry&&!r.battle&&!r.branch&&!r.minibossRoom&&!r.vault});
+  if(roamRooms.length){ var hr=roamRooms[0], hs=freeSpot(hr,24,24,120); pickups.push({x:hs.x,y:hs.y,w:24,h:24,type:'heart',taken:false,bob:0,secIdx:rooms.indexOf(hr)}); }
+  var battleObj=battleRoom? {secIdx:rooms.indexOf(battleRoom),locked:false,done:false,outT:0,barriers:[],
+    spawnerIds:spawners.filter(function(sp){return !!sp.battle}).map(function(sp){return sp.id})} : null;
+  var start={x:entryRoom.x+entryRoom.w/2-17, y:entryRoom.y+entryRoom.h-180};
+  var exitPad={x:start.x-11,y:start.y+70,w:56,h:14,secIdx:0};
+  enemies.forEach(function(e,i){ e.foeId='f'+i; });
+  return {w:(maxGx-minGx+1)*BK_RW, h:(maxGy-minGy+1)*BK_RH, plats:plats, enemies:enemies, spawners:spawners, pickups:pickups, chests:[], spikes:[], decors:decors,
+          portal:null, start:start, rooms:rooms.length, sections:rooms, critCount:rooms.length, cols:(maxGx-minGx+1), rows:(maxGy-minGy+1), edges:edges,
+          groundTop:entryRoom.floorY, battle:battleObj, shortcuts:[], topDown:true, entryIdx:0, exitPad:exitPad, segSize:0};
+}
+function saveBunkerState(){
+  if(G.mode!=='bunker'||!G.world||!G.world.enemies)return;
+  var foes={};
+  G.world.enemies.forEach(function(e){ if(e.foeId)foes[e.foeId]={dead:!!e.dead,hp:e.hp,x:e.x,y:e.y}; });
+  var rev=[];
+  if(G.explored)Object.keys(G.explored).forEach(function(k){ if(G.explored[k])rev.push(parseInt(k,10)); });
+  var dropsSave=[]; // uncollected kill drops persist per room; the branch cache is regenerated by the layout itself
+  if(G.world.pickups)G.world.pickups.forEach(function(pk){ if(!pk.taken&&!pk.cache&&(pk.type==='scrapDrop'||pk.type==='compDrop'))dropsSave.push({x:pk.x,y:pk.y,type:pk.type,amt:pk.amt||1,secIdx:pk.secIdx}); });
+  G.bunkerSave={revealed:rev,foes:foes,drops:dropsSave};
+}
+function restoreBunkerState(){
+  var W=G.world; if(!W)return;
+  var saved=G.bunkerSave;
+  G.explored={};
+  if(!saved){ revealSection(W.entryIdx||0); return; } // fresh bunker: fogged except the entry room
+  saved.revealed.forEach(function(ix){ if(W.sections[ix])G.explored[ix]=true; });
+  if(!G.explored[W.entryIdx||0])G.explored[W.entryIdx||0]=true;
+  W.enemies.forEach(function(e){
+    var sv=e.foeId? saved.foes[e.foeId] : null;
+    if(sv){ e.dead=!!sv.dead; e.hp=sv.hp; e.x=sv.x; e.y=sv.y; }
+    if(e.dead){ e.dormant=false; e.awaitDist=false; e.spawnT=0; }
+    else if(G.explored[e.secIdx]){ e.dormant=false; e.awaitDist=false; e.spawnT=0; }
+    else e.dormant=true;
+  });
+  // a guardian already dead means the Power Cell it guarded stands released
+  var mb=null; W.enemies.forEach(function(e){ if(e.miniboss)mb=e; });
+  if(mb&&mb.dead)W.pickups.forEach(function(pk){ if(pk.type==='cell')pk.locked=false; });
+  if(saved.drops)saved.drops.forEach(function(d){ W.pickups.push({x:d.x,y:d.y,w:22,h:22,type:d.type,amt:d.amt||1,taken:false,bob:0,secIdx:d.secIdx}); });
+}
+// The bunker re-rolls ONLY once stripped: its Power Cell banked AND no
+// wreck of yours still lying in it — the same rule as a factory site.
+function maybeRerollBunker(){
+  var bs=G.bunkerSite; if(!bs||!bs.compTaken)return;
+  if(G.corpses.some(function(c){return c.site===-2}))return;
+  bs.seed=Math.floor(Math.random()*900000000)+1000; bs.level+=1; bs.compTaken=false;
+  G.bunkerSave=null;
+  if(G.spawnerStates)delete G.spawnerStates['BK'];
+  toast('🗺️ The Bunker is stripped and sealed off. A new bunker layout (Lv '+bs.level+') waits at the town door.');
+}
+function startBunker(){
+  if(!G.botAlive){ toast('🤖 No working bot — build one at the workshop first.'); return; }
+  var bs=G.bunkerSite;
+  G.mode='bunker'; G.level=bs.level;
+  resetRunState();
+  G.world=genBunker(bs.seed, bs.level);
+  var hpCarry=G.player?G.player.hp:undefined;
+  G.player=makePlayer(G.world);
+  if(hpCarry!==undefined)G.player.hp=Math.min(hpCarry,G.player.maxHp);
+  G.bullets=[]; G.eBullets=[]; G.parts=[]; G.texts=[]; G.bolts=[]; G.pendingBounces=[];
+  G.camX=undefined; G.camY=undefined;
+  G.currentSec=G.world.entryIdx||0;
+  restoreBunkerState(); // fog + roster: fresh = only the entry room revealed; a persisting bunker keeps its dead where they fell
+  var savedSp=G.spawnerStates&&G.spawnerStates['BK'];
+  if(savedSp)G.world.spawners.forEach(function(sp){ var sv=savedSp[sp.id]; if(sv){ sp.hp=sv.hp; sp.dead=!!sv.dead; sp.budgetLeft=sv.budgetLeft; } });
+  G.nearExit=false; G.nearPortal=false; G.nearShortcut=null;
+  G.state='play';
+  hideAll();
+  var nc=G.corpses.filter(function(c){return c.site===-2}).length;
+  toast('🛡 THE BUNKER (Lv '+bs.level+') — top-down: no jumping down here. Same gun, mods, XP and drops. The 🔋 Power Cell waits behind the guardian 👹; the ⛏ extraction exit in this entry room is live from the start.'+(nc?' ♻ '+nc+' wreck'+(nc>1?'s':'')+' in the bunker.':''));
+  updateHUD();
+}
+// Axis-separated top-down movement with sub-stepping: a body moves one
+// axis at a time and clamps at the first face it meets (wall sliding),
+// and no single sub-step travels more than ~9px, so even a full-speed
+// diagonal can never tunnel through a 22px wall.
+function tdMove(e,dt,solids){
+  var dist=Math.max(Math.abs(e.vx||0),Math.abs(e.vy||0))*dt;
+  var steps=Math.max(1,Math.min(6,Math.ceil(dist/9))), sdt=dt/steps, s;
+  for(s=0;s<steps;s++){
+    e.x+=e.vx*sdt;
+    for(var i=0;i<solids.length;i++){ var pl=solids[i]; if(overlap(e,pl)){ if(e.vx>0)e.x=pl.x-e.w; else if(e.vx<0)e.x=pl.x+pl.w; } }
+    e.y+=e.vy*sdt;
+    for(var j=0;j<solids.length;j++){ var q=solids[j]; if(overlap(e,q)){ if(e.vy>0)e.y=q.y-e.h; else if(e.vy<0)e.y=q.y+q.h; } }
+  }
+}
+
+function updateBunker(dt){
+  var p=G.player, W=G.world, m=G.mods;
+  G.time+=dt;
+  if(m.regen>0)p.hp=Math.min(p.maxHp,p.hp+m.regen*dt);
+  p.invuln=Math.max(0,p.invuln-dt); p.fireT-=dt;
+  // 8-way movement: the same joystick and WASD/arrow keys, the same
+  // move-speed tuning, no gravity and no jumping
+  var mx=inputMove(), my=0;
+  if(keys['w']||keys['arrowup'])my-=1;
+  if(inputDown())my+=1;
+  if(joy.active)my+=joy.dy;
+  my=Math.max(-1,Math.min(1,my));
+  var len=Math.hypot(mx,my); if(len>1){ mx/=len; my/=len; }
+  var spd=m.moveSpeed*(G.overT>0? 1+(((TUN.overchargeMult===undefined?1.5:TUN.overchargeMult)-1)*0.36) : 1);
+  p.vx=mx*spd; p.vy=my*spd;
+  if(mx!==0)p.face=mx>0?1:-1;
+  if(mx!==0||my!==0)p.walkT+=dt*10;
+  var solids=W.plats.slice();
+  if(W.spawners)W.spawners.forEach(function(sp){ if(!sp.dead)solids.push(sp); });
+  tdMove(p,dt,solids);
+  p.x=Math.max(2,Math.min(W.w-p.w-2,p.x)); p.y=Math.max(2,Math.min(W.h-p.h-2,p.y));
+  // current room + fog: stepping into a room lifts its fog for good and
+  // materialises its roster through the telegraph (shared revealSection)
+  var secIdx=sectionIndexOfPoint(p.x+p.w/2,p.y+p.h/2);
+  if(secIdx<0)secIdx=G.currentSec||0;
+  G.currentSec=secIdx;
+  if(!G.explored)G.explored={};
+  revealSection(secIdx);
+  var secNow=W.sections[secIdx];
+  if(secNow)document.getElementById('roomLabel').textContent='🛡 The Bunker • '+secNow.name+(secNow.battle?' • ⚔️ BATTLE ROOM':secNow.minibossRoom?' • 👹 GUARDIAN':secNow.branch?' • 🏭 BRANCH CACHE':secNow.vault?' • 🔋 VAULT':secNow.entry?' • ⛏ EXTRACTION EXIT LIVE':'');
+  // autofire — identical rules to the factory: snapshot aim at the
+  // exposed aim point, line-of-sight priority with the walls as the
+  // blockers, and the move-and-fire dial (Accuracy keys off total speed)
+  var pcx=p.x+p.w/2, pcy=p.y+p.h/2;
+  var list=[];
+  W.enemies.forEach(function(e){ if(!e.dead&&!e.dormant&&!(e.spawnT>0))list.push(e); });
+  if(W.spawners)W.spawners.forEach(function(sp){ if(!sp.dead&&secRevealed(sp.secIdx))list.push(sp); });
+  var blockers=[]; W.plats.forEach(function(pl){ if(!pl.oneWay)blockers.push(pl); });
+  var target=selectTarget(list,pcx,pcy,blockers);
+  if(target){
+    var tx=(target._aimX!==undefined?target._aimX:target.x+target.w/2), ty=(target._aimY!==undefined?target._aimY:target.y+target.h/2);
+    p.aim=Math.atan2(ty-pcy,tx-pcx); p.face=tx>=pcx?1:-1;
+    p.aimDist=Math.hypot(tx-pcx,ty-pcy);
+    G._fireTarget=target;
+    playerFire(p,pcx,pcy, G.overT>0?(TUN.overchargeMult===undefined?1.5:TUN.overchargeMult):1);
+  } else { p.aimDist=0; p.spreadRad=currentSpreadRad(p); }
+  // bullets: the shared pass — player shots die on (or Bounce off) the
+  // same walls, Chain hops travel, Homing steers in 2D, enemy shots fly
+  // straight and are dodgeable
+  updateBullets(G.bullets,dt,true); updateBullets(G.eBullets,dt,false);
+  if(G.state!=='play')return; // a bullet ended the run
+  // ---- enemy AI, adapted to top-down motion ----
+  function driftTo(e,tx2,ty2,k,cap){
+    var vx=(tx2-(e.x+e.w/2))*k, vy=(ty2-(e.y+e.h/2))*k, l=Math.hypot(vx,vy);
+    if(l>cap){ vx*=cap/l; vy*=cap/l; }
+    e.vx=vx; e.vy=vy;
+  }
+  W.enemies.forEach(function(e){
+    if(e.dead)return;
+    if(e.dormant){
+      if(e.awaitDist){ var ad=Math.hypot(e.x+e.w/2-pcx, e.y+e.h/2-pcy);
+        if(ad>=SPAWN_MIN_DIST+12){ e.awaitDist=false; e.dormant=false; e.spawnT=SPAWN_TELEGRAPH; } }
+      return;
+    }
+    if(e.spawnT>0){ e.spawnT-=dt; e.flash=Math.max(0,e.flash-dt); return; } // materialising: visible, not yet active or dangerous
+    e.flash=Math.max(0,e.flash-dt); e.t+=dt;
+    var ecx=e.x+e.w/2, ecy=e.y+e.h/2;
+    var dx=pcx-ecx, dy=pcy-ecy, d=Math.hypot(dx,dy)||1;
+    var spM=TUN.enemySpeedMult||1;
+    if(e.stun>0){ e.stun-=dt; tdMove(e,dt,solids); var dk=Math.pow(0.86,dt*60); e.vx*=dk; e.vy*=dk; return; }
+    if(e.type==='walker'){
+      // chase, with the factory walker's dodge pressure: a weave across
+      // the approach line and periodic perpendicular sidestep dashes, so
+      // snapshot-aimed shots at where it WAS genuinely whiff
+      e.dirT=(e.dirT===undefined? rf2(0.8,2.0) : e.dirT-dt);
+      if(e.dirT<=0){ e.dirT=rf2(0.9,2.2); if(Math.random()<0.35){ e.dashT=0.28; e.dashSide=Math.random()<0.5?1:-1; } }
+      e.dashT=Math.max(0,(e.dashT||0)-dt);
+      if(d<560){
+        if(e.dashT>0){ e.vx=(-dy/d)*e.dashSide*150*spM; e.vy=(dx/d)*e.dashSide*150*spM; }
+        else { var wob=Math.sin(e.t*3.1)*0.45, ca=Math.cos(wob), sa=Math.sin(wob), ux=dx/d, uy=dy/d;
+          e.vx=(ux*ca-uy*sa)*62*spM; e.vy=(ux*sa+uy*ca)*62*spM; }
+      } else driftTo(e, e.homeX+e.w/2+Math.sin(e.t*0.7)*42, e.homeY+e.h/2+Math.cos(e.t*0.9)*26, 1.4, 40*spM);
+      tdMove(e,dt,solids);
+    } else if(e.type==='slime'){
+      if(d<420){ e.vx=dx/d*80*spM; e.vy=dy/d*80*spM; }
+      else driftTo(e, e.homeX+e.w/2+Math.sin(e.t*0.7)*42, e.homeY+e.h/2+Math.cos(e.t*0.9)*26, 1.6, 60*spM);
+      tdMove(e,dt,solids);
+    } else if(e.type==='flyer'){
+      // drifts freely in 2D: approach with a strong sideways weave
+      if(d<460){ var fsp=95*spM, wvx=-dy/d, wvy=dx/d, wv=Math.sin(e.t*4.3)*62;
+        e.vx=dx/d*fsp + wvx*wv; e.vy=dy/d*fsp + wvy*wv; }
+      else driftTo(e, e.homeX+e.w/2+Math.sin(e.t*0.9)*46, e.homeY+e.h/2+Math.cos(e.t*1.3)*20, 1.6, 70*spM);
+      tdMove(e,dt,solids);
+    } else if(e.type==='turret'){
+      e.fireT-=dt; // static: aimed 2D shots at where you are when it fires
+      if(e.fireT<=0&&d<480){ e.fireT=Math.max(0.55,(2.1-G.level*0.08)/(TUN.enemyFireMult||1)); spawnBullet(ecx,ecy,Math.atan2(dy,dx),false,(8+G.level)*(TUN.enemyDmgMult||1)); }
+    } else if(e.type==='brute'){
+      if(d<430){ e.vx=dx/d*135*spM; e.vy=dy/d*135*spM; } // the charge
+      else driftTo(e, e.homeX+e.w/2+Math.sin(e.t*0.5)*60, e.homeY+e.h/2+Math.cos(e.t*0.4)*40, 1.2, 40*spM);
+      tdMove(e,dt,solids);
+    } else if(e.type==='miniboss'){
+      // the guardian: a slow advance plus aimed volleys — same fire
+      // discipline and base damage as a map-1 miniboss, no escalation
+      if(d>110){ e.vx=dx/d*40*spM; e.vy=dy/d*40*spM; } else { e.vx=0; e.vy=0; }
+      tdMove(e,dt,solids);
+      e.fireT-=dt;
+      if(e.fireT<=0&&d<640){ e.fireT=Math.max(0.85,(e.hp<e.maxhp*0.5?1.7:2.3)/(TUN.enemyFireMult||1)); spawnBullet(ecx,ecy,Math.atan2(dy,dx),false,(11+G.level)*(TUN.enemyDmgMult||1)); }
+    }
+    if(overlap(p,e))hurtPlayer((e.type==='miniboss'?20 : e.type==='brute'?16 : 10)*(TUN.enemyDmgMult||1));
+  });
+  if(G.state!=='play')return; // contact ended the run
+  updateSpawners(dt);
+  // pickups — the factory rules exactly: physical tokens where they
+  // fell, magnet pull, walk-over collection; fogged rooms give nothing
+  W.pickups.forEach(function(pk){
+    if(pk.taken)return;
+    if(pk.secIdx!==undefined&&pk.secIdx>=0&&!secRevealed(pk.secIdx))return;
+    pk.bob+=dt*3;
+    var dx=p.x+p.w/2-(pk.x+pk.w/2), dy=p.y+p.h/2-(pk.y+pk.h/2), d=Math.hypot(dx,dy);
+    if(pk.type==='coin'&&d<G.mods.magnet&&d>1){ pk.x+=dx/d*260*dt; pk.y+=dy/d*260*dt; }
+    if((pk.type==='scrapDrop'||pk.type==='compDrop')&&d<Math.max(48,G.mods.magnet)&&d>1){ pk.x+=dx/d*300*dt; pk.y+=dy/d*300*dt; }
+    if(overlap(p,pk)){
+      if(pk.type==='cell'&&pk.locked){ // sealed in its containment field until the guardian dies
+        if(!pk._lockMsg||G.time-pk._lockMsg>2.5){ pk._lockMsg=G.time; addText(pk.x-8,pk.y-10,'🔒 SEALED — the guardian still lives','#fca5a5'); }
+        return;
+      }
+      pk.taken=true;
+      if(pk.type==='coin'){ G.coins++; SFX.coin(); addText(pk.x,pk.y-6,'+1 🔩','#fbbf24'); }
+      if(pk.type==='scrapDrop'){ var sa=pk.amt||1; G.coins+=sa; SFX.coin(); addText(pk.x,pk.y-6,'+'+sa+' 🔩','#fbbf24'); }
+      if(pk.type==='compDrop'){ var ca2=pk.amt||1; G.carriedComp+=ca2; SFX.coin(); addText(pk.x,pk.y-6,'+'+ca2+' ⚙️','#a5f3fc'); }
+      if(pk.type==='heart'){ var healZ=(TUN.healAmount===undefined?30:TUN.healAmount); p.hp=Math.min(p.maxHp,p.hp+healZ); SFX.pick(); addText(pk.x,pk.y-6,'+'+healZ+' ❤️','#4ade80'); }
+      if(pk.type==='cell'){ p.hasCell=true; G.carriedComp+=3; G.overT=20; SFX.pick(); toast('🔋 Power Cell component in the haul (+3 ⚙️) — and it OVERCHARGES this bot: +damage & +speed until you leave. Walk it back to the entry room and extract.'); }
+      updateHUD();
+    }
+  });
+  // ---- battle room: seals on entry, unseals when its fabricator
+  // waves are spent and every bot they produced is dead — the factory
+  // seal discipline (whole body in, clear of every doorway) adapted to
+  // top-down doorways, whose barrier is the doorway gap itself ----
+  var B=W.battle;
+  if(B&&!B.done){
+    var bSec=W.sections[B.secIdx];
+    var SEAL_CLEAR=16;
+    var fullyIn= bSec && p.x>=bSec.x+30 && p.x+p.w<=bSec.x+bSec.w-30 && p.y>=bSec.y+30 && p.y+p.h<=bSec.y+bSec.h-30;
+    if(!B.locked&&G.currentSec===B.secIdx&&fullyIn){
+      var bars=[];
+      W.edges.forEach(function(e){ if((e.a===bSec||e.b===bSec)&&e.door)bars.push({x:e.door.x,y:e.door.y,w:e.door.w,h:e.door.h,energy:true}); });
+      var sealClear=true;
+      for(var sbi=0;sbi<bars.length;sbi++){ if(overlap(p,{x:bars[sbi].x-SEAL_CLEAR,y:bars[sbi].y-SEAL_CLEAR,w:bars[sbi].w+SEAL_CLEAR*2,h:bars[sbi].h+SEAL_CLEAR*2})){ sealClear=false; break; } }
+      if(sealClear){
+        B.locked=true; B.outT=0; B.barriers=bars;
+        B.barriers.forEach(function(br){ W.plats.push(br); });
+        toast('⚔️ BATTLE ROOM — exits sealed! Clear every fabricator wave to reopen the doors.');
+        SFX.die();
+      }
+    }
+    if(B.locked){
+      if(G.currentSec!==B.secIdx){
+        B.outT=(B.outT||0)+dt;
+        if(B.outT>0.35){
+          B.locked=false; B.outT=0;
+          B.barriers.forEach(function(br){ var bix=W.plats.indexOf(br); if(bix>=0)W.plats.splice(bix,1); });
+          B.barriers=[];
+          toast('⚔️ The battle room seal drops — it only holds while you are inside. Head back in to fight the waves.');
+        }
+      } else B.outT=0;
+      if(B.locked){
+        var wavesSpent=true;
+        W.spawners.forEach(function(sp){ if(B.spawnerIds.indexOf(sp.id)>=0&&!sp.dead&&sp.budgetLeft>0)wavesSpent=false; });
+        var anyAlive=false;
+        W.enemies.forEach(function(e2){ if(!e2.dead&&e2.spawned&&B.spawnerIds.indexOf(e2.spawnerId)>=0)anyAlive=true; });
+        if(wavesSpent&&!anyAlive){
+          B.done=true; B.locked=false;
+          B.barriers.forEach(function(br){ var ix=W.plats.indexOf(br); if(ix>=0)W.plats.splice(ix,1); });
+          B.barriers=[];
+          toast('✅ Battle room cleared — the exits are open again.');
+          SFX.win();
+        }
+      }
+    }
+  }
+  // the extraction exit, by the entry spawn: live from the start,
+  // leaving is a deliberate press (see interact / syncPrompt)
+  G.nearExit= W.exitPad? overlap(p,{x:W.exitPad.x-16,y:W.exitPad.y-36,w:W.exitPad.w+32,h:W.exitPad.h+56}) : false;
+  G.nearPortal=false; G.nearShortcut=null;
+  checkCorpseTouch(-2);
+  if(G.overT>0)G.overT-=dt;
+  if(W.unlockFx>0)W.unlockFx=Math.max(0,W.unlockFx-dt);
+  G.parts=G.parts.filter(function(pt){ pt.t+=dt; pt.x+=pt.vx*dt; pt.y+=pt.vy*dt; pt.vy+=300*dt; return pt.t<pt.life; });
+  G.texts=G.texts.filter(function(t){ t.t+=dt; t.y-=34*dt; return t.t<t.life; });
+  var vm=viewMetrics();
+  var tcx=Math.max(0,Math.min(Math.max(0,W.w-vm.w), p.x+p.w/2-vm.w/2));
+  var tcy=Math.max(0,Math.min(Math.max(0,W.h-vm.h), p.y+p.h/2-vm.h/2));
+  if(G.camX===undefined)G.camX=tcx;
+  if(G.camY===undefined)G.camY=tcy;
+  G.camX+=(tcx-G.camX)*Math.min(1,dt*6); G.camY+=(tcy-G.camY)*Math.min(1,dt*6);
+  G.shake=Math.max(0,G.shake-dt*26);
+  if(Math.floor(G.time*2)!==Math.floor((G.time-dt)*2))updateHUD(true);
+}
+function bunkerDoorGeoms(W){
+  var out=[];
+  if(!W||!W.edges)return out;
+  W.edges.forEach(function(e){
+    if(!e.door)return;
+    out.push({door:e.door,vert:!!e.vert,ia:W.sections.indexOf(e.a),ib:W.sections.indexOf(e.b),cx:e.door.x+e.door.w/2,cy:e.door.y+e.door.h/2});
+  });
+  return out;
+}
+function drawBunkerDoorways(W,camX,camY,viewW,viewH,fogPass){
+  // the shared doorway presentation in plan view: pale frame posts,
+  // light spilling out of the opening into both rooms, marker diamond.
+  // A sealed battle doorway keeps its red striped field + lock diamond
+  // inside this frame (the barrier itself is drawn by platsDraw).
+  bunkerDoorGeoms(W).forEach(function(g){
+    var d=g.door;
+    if(d.x+d.w<camX-170||d.x>camX+viewW+170||d.y+d.h<camY-170||d.y>camY+viewH+170)return;
+    var aFog=!secRevealed(g.ia), bFog=!secRevealed(g.ib);
+    if(fogPass){ if(!(aFog||bFog))return; } else if(aFog||bFog)return;
+    var post= fogPass? '#e8f4ff' : '#9cc3e5';
+    var postHi= fogPass? '#ffffff' : '#d9edff';
+    var spillA= fogPass? 0.30 : 0.13;
+    ctx.save();
+    ctx.fillStyle='rgba(165,205,240,'+spillA+')';
+    if(g.vert){ ctx.fillRect(d.x-72,d.y,72,d.h); ctx.fillRect(d.x+d.w,d.y,72,d.h); }
+    else { ctx.fillRect(d.x,d.y-72,d.w,72); ctx.fillRect(d.x,d.y+d.h,d.w,72); }
+    ctx.fillStyle='rgba(219,238,255,'+(fogPass?0.20:0.10)+')'; ctx.fillRect(d.x,d.y,d.w,d.h);
+    ctx.fillStyle=post;
+    if(g.vert){ ctx.fillRect(d.x-3,d.y-9,d.w+6,9); ctx.fillRect(d.x-3,d.y+d.h,d.w+6,9); }
+    else { ctx.fillRect(d.x-9,d.y-3,9,d.h+6); ctx.fillRect(d.x+d.w,d.y-3,9,d.h+6); }
+    ctx.fillStyle=postHi;
+    if(g.vert){ ctx.fillRect(d.x-3,d.y-9,d.w+6,2.5); ctx.fillRect(d.x-3,d.y+d.h+6.5,d.w+6,2.5); }
+    else { ctx.fillRect(d.x-9,d.y-3,2.5,d.h+6); ctx.fillRect(d.x+d.w+6.5,d.y-3,2.5,d.h+6); }
+    ctx.save(); ctx.translate(g.cx,g.cy); ctx.rotate(Math.PI/4);
+    ctx.fillStyle=postHi; ctx.fillRect(-4.5,-4.5,9,9); ctx.fillStyle='#31597c'; ctx.fillRect(-2,-2,4,4); ctx.restore();
+    ctx.restore();
+  });
+}
+function renderBunker(){
+  var W=G.world,p=G.player; if(!W||!p)return;
+  var vm=viewMetrics(), scale=vm.scale, viewH=vm.h, viewW=vm.w;
+  var camX=Math.max(0,Math.min(Math.max(0,W.w-viewW), (G.camX!==undefined?G.camX:p.x+p.w/2-viewW/2)));
+  var camY=Math.max(0,Math.min(Math.max(0,W.h-viewH), (G.camY!==undefined?G.camY:p.y+p.h/2-viewH/2)));
+  var shX=G.shake?rf2(-G.shake,G.shake):0, shY=G.shake?rf2(-G.shake,G.shake):0;
+  function visB(o){ return o.x+(o.w||30)>camX-70 && o.x<camX+viewW+70 && o.y+(o.h||30)>camY-70 && o.y<camY+viewH+70; }
+  ctx.save(); ctx.scale(scale,scale); ctx.translate(-camX+shX,-camY+shY);
+  ctx.fillStyle='#04070c'; ctx.fillRect(camX-60,camY-60,viewW+120,viewH+120);
+  // room floors — quiet, like the sites: actors and doors carry the picture
+  W.decors.forEach(function(d){
+    if(d.y+d.h<camY-60||d.y>camY+viewH+60)return;
+    ctx.fillStyle=d.shade?'#0b1724':'#091320'; rr(d.x,d.y,d.w,d.h,10); ctx.fill();
+    ctx.strokeStyle='#18293c'; ctx.lineWidth=2; rr(d.x,d.y,d.w,d.h,10); ctx.stroke();
+    ctx.fillStyle='rgba(110,144,175,0.55)'; ctx.font='800 15px system-ui';
+    var sref=d.secRef;
+    ctx.fillText(((sref&&sref.entry)?'ENTRY • ':(sref&&sref.branch)?'BRANCH • ':(sref&&sref.battle)?'BATTLE ROOM • ':(sref&&sref.minibossRoom)?'GUARDIAN • ':(sref&&sref.vault)?'VAULT • ':'ROOM '+(d.room+1)+' • ')+d.name.toUpperCase(), d.x+16, d.y+28);
+  });
+  // the extraction exit in the entry room — the brightest cyan in the
+  // building, live from the start
+  if(W.exitPad){ var ep=W.exitPad, epcx=ep.x+ep.w/2, epcy=ep.y+ep.h/2;
+    ctx.fillStyle='rgba(34,211,238,'+(0.16+Math.sin(G.time*5)*0.06)+')';
+    ctx.beginPath(); ctx.ellipse(epcx,epcy,64,30,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(34,211,238,'+(0.55+Math.sin(G.time*5)*0.2)+')'; rr(ep.x,ep.y-12,ep.w,ep.h+24,6); ctx.fill();
+    ctx.fillStyle='#ecfeff'; ctx.fillRect(ep.x+8,ep.y-8,ep.w-16,3);
+    ctx.strokeStyle='#22d3ee'; ctx.lineWidth=2.5; rr(ep.x-3,ep.y-15,ep.w+6,ep.h+30,7); ctx.stroke();
+    ctx.strokeStyle='rgba(165,243,252,'+(0.5+Math.sin(G.time*5)*0.3)+')'; ctx.lineWidth=2;
+    var ringR=6+((G.time*26)%16);
+    ctx.beginPath(); ctx.ellipse(epcx,epcy,ep.w/2+ringR,20+ringR*0.5,0,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle='#cffafe'; ctx.font='800 11px system-ui'; ctx.textAlign='center';
+    ctx.fillText('⛏ EXTRACT — E: TOWN', epcx, ep.y-24); ctx.textAlign='left';
+  }
+  platsDraw(W); // walls, crates, and any sealed battle barriers (energy style)
+  drawBunkerDoorways(W,camX,camY,viewW,viewH,false);
+  drawCorpses(-2,camY,viewH);
+  // pickups — the sites' own shapes: hex-bolt scrap, gear components,
+  // medkit heal, and the Power Cell in its containment field while sealed
+  W.pickups.forEach(function(pk){ if(pk.taken||!visB(pk))return;
+    if(pk.secIdx!==undefined&&pk.secIdx>=0&&!secRevealed(pk.secIdx))return;
+    var bobY=Math.sin(pk.bob)*3;
+    var pcx=pk.x+pk.w/2, pcy=pk.y+pk.h/2+bobY;
+    if(pk.type==='coin'||pk.type==='scrapDrop'){
+      ctx.fillStyle='rgba(251,191,36,0.21)'; ctx.beginPath(); ctx.arc(pcx,pcy,16,0,Math.PI*2); ctx.fill();
+      ctx.save(); ctx.translate(pcx,pcy); ctx.rotate(Math.PI/6);
+      ctx.fillStyle='#fbbf24'; ctx.beginPath();
+      for(var hx3=0;hx3<6;hx3++){ var ha3=hx3*Math.PI/3; if(hx3===0)ctx.moveTo(Math.cos(ha3)*10,Math.sin(ha3)*10); else ctx.lineTo(Math.cos(ha3)*10,Math.sin(ha3)*10); }
+      ctx.closePath(); ctx.fill(); ctx.strokeStyle='#92400e'; ctx.lineWidth=2; ctx.stroke();
+      ctx.fillStyle='#78350f'; ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+      if(pk.type==='scrapDrop'&&(pk.amt||1)>1){ ctx.fillStyle='#fde68a'; ctx.font='900 11px system-ui'; ctx.textAlign='center'; ctx.fillText('×'+pk.amt,pcx,pcy-16); ctx.textAlign='left'; }
+    }
+    if(pk.type==='compDrop'){
+      ctx.fillStyle='rgba(165,243,252,0.20)'; ctx.beginPath(); ctx.arc(pcx,pcy,16,0,Math.PI*2); ctx.fill();
+      ctx.save(); ctx.translate(pcx,pcy);
+      ctx.fillStyle='#e2e8f0'; ctx.beginPath();
+      for(var gt=0;gt<8;gt++){ var ga=gt*Math.PI/4; ctx.rect(Math.cos(ga)*8-2.5,Math.sin(ga)*8-2.5,5,5); }
+      ctx.fill(); ctx.beginPath(); ctx.arc(0,0,8.5,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#64748b'; ctx.lineWidth=1.8; ctx.beginPath(); ctx.arc(0,0,8.5,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle='#0ea5e9'; ctx.beginPath(); ctx.arc(0,0,3.6,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+      if((pk.amt||1)>1){ ctx.fillStyle='#a5f3fc'; ctx.font='900 11px system-ui'; ctx.textAlign='center'; ctx.fillText('×'+pk.amt,pcx,pcy-16); ctx.textAlign='left'; }
+    }
+    if(pk.type==='heart'){
+      ctx.fillStyle='rgba(74,222,128,0.20)'; ctx.beginPath(); ctx.arc(pcx,pcy,16,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#f8fafc'; rr(pcx-11,pcy-11,22,22,5); ctx.fill();
+      ctx.strokeStyle='#16a34a'; ctx.lineWidth=2; rr(pcx-11,pcy-11,22,22,5); ctx.stroke();
+      ctx.fillStyle='#22c55e'; ctx.fillRect(pcx-2.5,pcy-7,5,14); ctx.fillRect(pcx-7,pcy-2.5,14,5);
+    }
+    if(pk.type==='cell'){
+      if(pk.locked){
+        // sealed: dimmed cell inside a slate containment ring with the
+        // lock diamond — readable as "not yet", never as loot to grab
+        ctx.strokeStyle='#476b7a'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(pcx,pcy,25,0,Math.PI*2); ctx.stroke();
+        ctx.fillStyle='rgba(19,39,48,0.5)'; ctx.beginPath(); ctx.arc(pcx,pcy,25,0,Math.PI*2); ctx.fill();
+        ctx.globalAlpha=0.45;
+        ctx.fillStyle='#164e63'; rr(pk.x,pk.y+bobY,26,26,6); ctx.fill();
+        ctx.save(); ctx.translate(pcx,pcy);
+        ctx.fillStyle='#fde047'; ctx.beginPath(); ctx.moveTo(2,-8); ctx.lineTo(-4,1); ctx.lineTo(0,1); ctx.lineTo(-2,8); ctx.lineTo(4,-1); ctx.lineTo(0,-1); ctx.closePath(); ctx.fill();
+        ctx.restore();
+        ctx.globalAlpha=1;
+        ctx.save(); ctx.translate(pcx,pcy+1); ctx.rotate(Math.PI/4);
+        ctx.fillStyle='#8fb8c7'; ctx.fillRect(-6,-6,12,12);
+        ctx.fillStyle='#132730'; ctx.fillRect(-3,-3,6,6); ctx.restore();
+        ctx.fillStyle='#8fb8c7'; ctx.font='800 10px system-ui'; ctx.textAlign='center'; ctx.fillText('SEALED',pcx,pcy+40); ctx.textAlign='left';
+      } else {
+        ctx.fillStyle='rgba(34,211,238,'+(0.18+Math.sin(G.time*5)*0.07)+')'; ctx.beginPath(); ctx.arc(pcx,pcy,21,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#164e63'; rr(pk.x,pk.y+bobY,26,26,6); ctx.fill();
+        ctx.fillStyle='#a5f3fc'; ctx.fillRect(pk.x+10,pk.y-4+bobY,6,4);
+        ctx.save(); ctx.translate(pcx,pcy);
+        ctx.fillStyle='#fde047'; ctx.beginPath(); ctx.moveTo(2,-8); ctx.lineTo(-4,1); ctx.lineTo(0,1); ctx.lineTo(-2,8); ctx.lineTo(4,-1); ctx.lineTo(0,-1); ctx.closePath(); ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle='#22d3ee'; ctx.lineWidth=2; rr(pk.x-3,pk.y-3+bobY,32,32,8); ctx.stroke();
+      }
+    }
+  });
+  W.enemies.forEach(function(e){ if(e.dead||e.dormant||!visB(e))return; drawEnemy(e); });
+  if(W.spawners)W.spawners.forEach(function(sp){ if(!visB(sp)&&!(sp.warmup>0))return; drawSpawner(sp); });
+  G.bullets.forEach(function(b){ drawBullet(b,true); });
+  G.eBullets.forEach(function(b){ drawBullet(b,false); });
+  // FOG OF WAR: a room never entered is dark — its roster, fabricators
+  // and the cell cannot be read; walls stay faintly readable as
+  // silhouettes so a route can still be planned
+  W.sections.forEach(function(s,si){
+    if(secRevealed(si))return;
+    if(s.y+s.h<camY-60||s.y>camY+viewH+60||s.x+s.w<camX-60||s.x>camX+viewW+60)return;
+    ctx.fillStyle='rgba(3,7,13,0.86)'; ctx.fillRect(s.x,s.y,s.w,s.h);
+    ctx.strokeStyle='rgba(120,160,200,0.16)'; ctx.lineWidth=2; ctx.strokeRect(s.x+1,s.y+1,s.w-2,s.h-2);
+  });
+  // …but doorways punch back through the fog, brighter: "there is a way
+  // through here" stays readable — never what lies beyond it
+  drawBunkerDoorways(W,camX,camY,viewW,viewH,true);
+  drawPlayerTop(p);
+  G.parts.forEach(function(pt){ ctx.globalAlpha=1-pt.t/pt.life; ctx.fillStyle=pt.color; ctx.fillRect(pt.x,pt.y,pt.size,pt.size); }); ctx.globalAlpha=1;
+  ctx.font='800 14px system-ui'; G.texts.forEach(function(t){ ctx.globalAlpha=1-t.t/t.life; ctx.fillStyle=t.color; ctx.fillText(t.txt,t.x-8,t.y); }); ctx.globalAlpha=1;
+  ctx.restore();
+  // off-screen objective pointer — the cell until it is aboard, then
+  // the way home; it never points into an unentered room
+  if(G.state==='play'&&p){
+    var tgt=null,tIc='';
+    if(!p.hasCell){ for(var pi=0;pi<W.pickups.length;pi++){ if(W.pickups[pi].type==='cell'&&!W.pickups[pi].taken){ tgt={x:W.pickups[pi].x+13,y:W.pickups[pi].y+13,sec:W.pickups[pi].secIdx}; tIc='🔋'; break; } } }
+    else if(W.exitPad){ tgt={x:W.exitPad.x+W.exitPad.w/2,y:W.exitPad.y+W.exitPad.h/2,sec:W.exitPad.secIdx}; tIc='⛏'; }
+    if(tgt&&(tgt.sec===undefined||tgt.sec<0||secRevealed(tgt.sec))){
+      var tsx=(tgt.x-camX)*scale, tsy=(tgt.y-camY)*scale;
+      if(tsx<-10||tsx>VW+10||tsy<-10||tsy>VH+10){
+        var ix=Math.max(28,Math.min(VW-28,tsx)), iy=Math.max(72,Math.min(VH-100,tsy));
+        ctx.fillStyle='rgba(15,23,32,0.88)'; ctx.beginPath(); ctx.arc(ix,iy,17,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle='#22d3ee'; ctx.lineWidth=2; ctx.stroke();
+        ctx.font='15px system-ui'; ctx.textAlign='center'; ctx.fillText(tIc,ix,iy+5); ctx.textAlign='left';
+      }
+    }
+  }
+  drawMap(document.getElementById('minimap'),false);
+}
+
 // ---------- Interact / prompt ----------
 function syncPrompt(){
   var pr=$('prompt'), ex=$('exitBtn');
   // the big round button is JUMP inside a site, HOP in the top-down town
   var jb=$('jumpBtn'), hopMode=(G.mode==='overworld'), jbl=hopMode?'HOP':'JUMP';
   if(jb.textContent!==jbl){ jb.textContent=jbl; jb.setAttribute('aria-label',hopMode?'Hop':'Jump'); }
+  jb.style.opacity=(G.mode==='bunker')?'0.35':''; // no jumping in the bunker: the indicator sits dimmed and inert there
   if(G.state!=='play'){ pr.classList.remove('show'); ex.classList.remove('show'); return; }
   if(G.mode==='zone'&&G.nearPortal){
     if(minibossAliveInMap()){ pr.textContent='🚪 MAP DOOR — inert while this map\u2019s miniboss lives. Kill it to open the way on.'; pr.classList.add('show'); ex.classList.remove('show'); }
@@ -3575,6 +4308,12 @@ function syncPrompt(){
   } else if(G.mode==='zone'&&G.nearShortcut){
     pr.textContent='⛏ SEGMENT CLEARED — extraction shortcut active. Press E or tap to return to town and bank your haul (🔩'+G.coins+' ⚙️'+G.carriedComp+').';
     pr.classList.add('show'); ex.textContent='⛏ SHORTCUT — RETURN TO TOWN'; ex.classList.add('show');
+  } else if(G.mode==='bunker'&&G.nearExit){
+    pr.textContent='⛏ EXTRACTION EXIT — press E or tap EXTRACT to return to town and bank your haul (🔩'+G.coins+' ⚙️'+G.carriedComp+'). The run (and its mods) ends.';
+    pr.classList.add('show'); ex.textContent='⛏ EXTRACT — RETURN TO TOWN'; ex.classList.add('show');
+  } else if(G.mode==='overworld'&&G.nearBunker){
+    pr.textContent='🛡 THE BUNKER — a top-down site: no jumping, 8-way movement, the same gun, mods, XP and wreck rules. Press E or tap here to send the bot down.';
+    pr.classList.add('show'); ex.textContent='🛡 ENTER THE BUNKER'; ex.classList.add('show');
   } else if(G.mode==='overworld'&&G.nearWorkshop){
     pr.textContent='🔧 TOWN WORKSHOP — press E or tap here to build / rebuild a bot and fix up the town.';
     pr.classList.add('show'); ex.textContent='🔧 OPEN WORKSHOP'; ex.classList.add('show');
@@ -3587,6 +4326,8 @@ function interact(){
     if(isFinalMap())completeZone(); else goNextMap();
   }
   else if(G.mode==='zone'&&(G.nearExit||G.nearShortcut))extract();
+  else if(G.mode==='bunker'&&G.nearExit)extract();
+  else if(G.mode==='overworld'&&G.nearBunker)startBunker();
   else if(G.mode==='overworld'&&G.nearWorkshop)openWorkshop();
 }
 $('exitBtn').addEventListener('click',interact);
@@ -3658,7 +4399,7 @@ $('rerollBtn').addEventListener('click',function(){
 });
 // ---------- Inventory (BAG): driven by the SAME data model as gameplay ----------
 function inventoryData(){
-  var inRun=(G.mode==='zone');
+  var inRun=(G.mode==='zone'||G.mode==='bunker');
   return {
     inRun:inRun,
     mods:MOD_POOL.map(function(o){ return {id:o.id,name:o.name,stacks:G.runMods[o.id]||0,desc:o.desc}; }),
@@ -3670,7 +4411,7 @@ function inventoryData(){
     bankScrap:G.bankScrap||0, bankComp:G.bankComp||0,
     mapIdx:(G.mapIdx||0)+1, mapsPerZone:G.mapsPerZone||3,
     minibossDown: inRun? !minibossAliveInMap() : false,
-    zoneName: (G.zoneIdx>=0&&G.zones[G.zoneIdx])?G.zones[G.zoneIdx].name:'—'
+    zoneName: G.mode==='bunker'?'The Bunker':((G.zoneIdx>=0&&G.zones[G.zoneIdx])?G.zones[G.zoneIdx].name:'—')
   };
 }
 function openBag(){
@@ -3681,7 +4422,7 @@ function openBag(){
 function renderBag(){
   var d=inventoryData(), el=$('bagBody'), h='';
   if(d.inRun){
-    h+='<div class="stats"><span class="pill">🗺️ '+d.zoneName+' — Map '+d.mapIdx+' of '+d.mapsPerZone+'</span><span class="pill">👹 This map\u2019s miniboss: '+(d.minibossDown?'DOWN ✓ (door open)':'alive')+'</span></div>';
+    h+='<div class="stats"><span class="pill">'+(G.mode==='bunker'?'🛡 The Bunker — one top-down site':'🗺️ '+d.zoneName+' — Map '+d.mapIdx+' of '+d.mapsPerZone)+'</span><span class="pill">👹 '+(G.mode==='bunker'?'The guardian':'This map\u2019s miniboss')+': '+(d.minibossDown?'DOWN ✓':'alive')+'</span></div>';
     h+='<h3 style="margin:14px 0 4px">🎁 In-run mods (lost on death / run end)</h3>';
     var any=false;
     d.mods.forEach(function(m){ if(m.stacks>0){ any=true; h+='<div class="proj"><div><h4>'+m.name+' '+roman(m.stacks)+' — ×'+m.stacks+'</h4><p>'+m.desc+'</p></div></div>'; } });
@@ -3922,6 +4663,16 @@ function updateHUD(light){
     $('enemyText').textContent=G.ow?G.ow.enemies.filter(function(e){return !e.dead}).length:0;
     return;
   }
+  if(G.mode==='bunker'){
+    $('carryText').textContent='🔩'+G.coins+' ⚙️'+G.carriedComp+(p.hasCell?' 🔋':'');
+    $('levelText').textContent='The Bunker Lv '+(G.bunkerSite?G.bunkerSite.level:1)+' • top-down'+(modSummaryText()!=='no mods yet'?' • '+modSummaryText():'');
+    $('cellText').textContent= p.hasCell? 'Power Cell aboard — back to the entry exit!' : (G.bunkerSite&&G.bunkerSite.compTaken? 'Power Cell banked ✓ — scrap & wrecks remain' : 'Find the Power Cell — behind the guardian');
+    $('cellPill').className='pill '+(p.hasCell?'cell-on':'cell-off');
+    var leftB=G.world?G.world.enemies.filter(function(e){return !e.dead&&!e.dormant}).length:0;
+    if(G.world&&G.world.spawners)leftB+=G.world.spawners.filter(function(sp){return !sp.dead&&secRevealed(sp.secIdx)}).length;
+    $('enemyText').textContent=leftB;
+    return;
+  }
   $('carryText').textContent='🔩'+G.coins+' ⚙️'+G.carriedComp+(p.hasCell?' 🔋':'');
   $('levelText').textContent=(G.zones[G.zoneIdx]?G.zones[G.zoneIdx].name:'Site')+' Lv '+G.level+' • Map '+((G.mapIdx||0)+1)+'/'+(G.mapsPerZone||3)+(modSummaryText()!=='no mods yet'?' • '+modSummaryText():'');
   var z=G.zones[G.zoneIdx];
@@ -3969,9 +4720,67 @@ function drawMap(cv,big){
       else { c.beginPath(); c.arc(dx2+dw2/2-2.5,dy2,1.4,0,Math.PI*2); c.fill(); }
       if(big){ c.fillStyle='#fff'; c.font='800 11px system-ui'; c.textAlign='center'; c.fillText(d.name,dx2,dy2+22); c.textAlign='left'; }
     });
+    if(O2.bunkerDoor){ var bx2=ox2+(O2.bunkerDoor.x+O2.bunkerDoor.w/2)*sc2, by2=oy2+(O2.bunkerDoor.y+O2.bunkerDoor.h/2)*sc2;
+      var bw3=big?13:8, bh3=big?16:10, bkCl=!!(G.bunkerSite&&G.bunkerSite.compTaken);
+      c.fillStyle=bkCl?'#22c55e':'#164e63'; c.fillRect(bx2-bw3/2,by2-bh3/2,bw3,bh3);
+      c.strokeStyle=bkCl?'#4ade80':'#22d3ee'; c.lineWidth=big?2.4:1.8; c.strokeRect(bx2-bw3/2,by2-bh3/2,bw3,bh3);
+      c.fillStyle='#fff'; c.font='900 '+(big?9:7)+'px system-ui'; c.textAlign='center'; c.fillText('🛡',bx2,by2+(big?3:2)); c.textAlign='left';
+      if(big){ c.fillStyle='#fff'; c.font='800 11px system-ui'; c.textAlign='center'; c.fillText('THE BUNKER',bx2,by2+22); c.textAlign='left'; } }
     var ux2=ox2+(G.player.x+G.player.w/2)*sc2, uy2=oy2+(G.player.y+G.player.h/2)*sc2;
     c.fillStyle='#fff'; c.beginPath(); c.arc(ux2,uy2,big?6:4,0,Math.PI*2); c.fill();
     c.strokeStyle='#f59e0b'; c.lineWidth=2; c.beginPath(); c.arc(ux2,uy2,big?9:6.5,0,Math.PI*2); c.stroke();
+    return;
+  }
+  if(G.mode==='bunker'&&W&&W.topDown&&G.player){
+    // the bunker as a place: rooms in their true grid positions, fog
+    // respected — an unentered room stays dark, and nothing inside it
+    // (cell included) is ever marked
+    var pad3=big?16:5;
+    var sc3=Math.min((cw-pad3*2)/W.w,(ch-pad3*2)/W.h);
+    var ox3=(cw-W.w*sc3)/2, oy3=(ch-W.h*sc3)/2;
+    var explored3=G.explored||{};
+    if(W.edges)W.edges.forEach(function(e){
+      var ia=W.sections.indexOf(e.a), ib=W.sections.indexOf(e.b);
+      if(!explored3[ia]||!explored3[ib])return;
+      c.fillStyle='#51748f';
+      var ax=ox3+(e.a.x+e.a.w/2)*sc3, ay=oy3+(e.a.y+e.a.h/2)*sc3, bx=ox3+(e.b.x+e.b.w/2)*sc3, by=oy3+(e.b.y+e.b.h/2)*sc3;
+      c.fillRect(Math.min(ax,bx),Math.min(ay,by),Math.max(3,Math.abs(bx-ax)),Math.max(3,Math.abs(by-ay)));
+      if(e.door){ c.fillStyle='#d9edff'; c.beginPath(); c.arc(ox3+(e.door.x+e.door.w/2)*sc3, oy3+(e.door.y+e.door.h/2)*sc3, big?3.4:2.4,0,Math.PI*2); c.fill(); }
+    });
+    W.sections.forEach(function(s,i){
+      var x=ox3+s.x*sc3+1, y=oy3+s.y*sc3+1, w=s.w*sc3-2, h=s.h*sc3-2;
+      if(explored3[i]){
+        c.fillStyle= s.minibossRoom?'#7f1d1d': s.battle?'#b45309': s.branch?'#0f766e': s.vault?'#164e63':'#0369a1';
+        c.fillRect(x,y,w,h);
+        if(s.branch){ c.strokeStyle='#facc15'; c.setLineDash([4,3]); c.lineWidth=1.5; c.strokeRect(x+2,y+2,w-4,h-4); c.setLineDash([]); }
+      } else { c.fillStyle='#0e1620'; c.fillRect(x,y,w,h); }
+      c.strokeStyle= i===G.currentSec? '#f59e0b' : '#ffffff2a';
+      c.lineWidth= i===G.currentSec? 2.5 : 1;
+      c.strokeRect(x,y,w,h);
+    });
+    if(W.exitPad&&explored3[W.exitPad.secIdx]){
+      var ex2=ox3+(W.exitPad.x+W.exitPad.w/2)*sc3, ey2=oy3+(W.exitPad.y+W.exitPad.h/2)*sc3;
+      c.fillStyle='#164e63'; c.fillRect(ex2-4,ey2-5,8,10);
+      c.strokeStyle='#22d3ee'; c.lineWidth=1.8; c.strokeRect(ex2-4,ey2-5,8,10);
+      if(big){ c.fillStyle='#a5f3fc'; c.font='800 9px system-ui'; c.textAlign='center'; c.fillText('EXTRACT',ex2,ey2+16); c.textAlign='left'; }
+    }
+    for(var pi4=0;pi4<W.pickups.length;pi4++){ var pk4=W.pickups[pi4];
+      if(pk4.type==='cell'&&!pk4.taken){
+        if(pk4.secIdx!==undefined&&explored3[pk4.secIdx]){ c.font=(big?'17px':'12px')+' system-ui'; c.textAlign='center';
+          c.fillText('🔋', ox3+(pk4.x+13)*sc3, oy3+(pk4.y+15)*sc3); c.textAlign='left'; }
+        break; } }
+    G.corpses.forEach(function(cp){ if(cp.site!==-2)return;
+      var wi=-1;
+      for(var wsi=0;wsi<W.sections.length;wsi++){ var ws2=W.sections[wsi];
+        if(cp.x+20>=ws2.x&&cp.x+20<ws2.x+ws2.w&&cp.y+12>=ws2.y&&cp.y+12<ws2.y+ws2.h)wi=wsi; }
+      if(wi>=0&&explored3[wi]){ c.font=(big?'15px':'11px')+' system-ui'; c.textAlign='center';
+        c.fillText('♻', ox3+(cp.x+20)*sc3, oy3+(cp.y+14)*sc3); c.textAlign='left'; } });
+    if(W.spawners)W.spawners.forEach(function(sp){ if(sp.dead)return;
+      if(sp.secIdx!==undefined&&explored3[sp.secIdx]){ c.font=(big?'15px':'11px')+' system-ui'; c.textAlign='center';
+        c.fillText('🏭', ox3+(sp.x+27)*sc3, oy3+(sp.y+16)*sc3); c.textAlign='left'; } });
+    var ux3=ox3+(G.player.x+G.player.w/2)*sc3, uy3=oy3+(G.player.y+G.player.h/2)*sc3;
+    c.fillStyle='#fff'; c.beginPath(); c.arc(ux3,uy3,big?6:4,0,Math.PI*2); c.fill();
+    c.strokeStyle='#f59e0b'; c.lineWidth=2; c.beginPath(); c.arc(ux3,uy3,big?9:6.5,0,Math.PI*2); c.stroke();
     return;
   }
   if(!W||!W.sections||!G.player)return;
