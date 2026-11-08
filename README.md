@@ -8,4 +8,4 @@ Deployed by Cloudflare Pages from this repo. Pushes to the principal branch depl
 
 This repo's deployment is served at [salvage-bots.beeliever.net](https://salvage-bots.beeliever.net). The older address, autofire.beeliever.net, still serves the last zip-uploaded copy from the previous project until the domain is moved to this one.
 
-Working files (design pool, journey log, packaging script) live outside this repo. A new game build is published by copying the assembled package files over the ones here, bumping the cache name in `sw.js` (currently `salvage-bots-v6`), committing and pushing. The cache bump is not optional: without it, installed copies keep serving the older build.
+Working files (design pool, journey log, packaging script) live outside this repo. A new game build is published by copying the assembled package files over the ones here, bumping the cache name in `sw.js` (currently `salvage-bots-v7`), committing and pushing. The cache bump is not optional: without it, installed copies keep serving the older build.
